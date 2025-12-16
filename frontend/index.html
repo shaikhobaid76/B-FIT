@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B-FIT Gym App</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="assets/icons/favicon.ico">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/iconf.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/iconf.png">
+    <link rel="apple-touch-icon" href="assets/icons/apple-touch-iconf.png">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700;800&family=Kanit:wght@700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- External CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Hamburger Menu Button -->
+    <button class="hamburger-menu" id="hamburgerBtn">
+        <i class="fas fa-bars"></i>
+    </button>
+    
+    <!-- Page 1: Hero/Website Open -->
+    <div class="page active" id="heroPage">
+        <div class="page-container">
+            <div class="hero-content">
+                <!-- Custom Logo -->
+                <div class="gym-logo">
+                    <img src="assets/images/logo.png" alt="B-FIT Logo" id="mainLogo">
+                </div>
+                <h1 class="gym-name"></h1>
+                <p class="gym-slogan">Build Your Body. Build Your Confidence.</p>
+                <button class="hero-button" id="getStartedBtn">
+                    START YOUR JOURNEY
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Page 2: Login Page -->
+    <div class="page next" id="loginPage">
+        <div class="page-container">
+            <div class="auth-content">
+                <div class="auth-header">
+                    <!-- Login Logo -->
+                    <div class="auth-logo">
+                        <img src="assets/images/logo.png" alt="B-FIT Logo" id="loginLogo">
+                    </div>
+                    <h2>Welcome Back</h2>
+                    <p>Continue your fitness journey</p>
+                </div>
+                
+                <form class="auth-form" id="loginForm">
+                    <div class="input-group">
+                        <label for="loginPhone">Phone Number</label>
+                        <input type="tel" id="loginPhone" placeholder="Enter your phone number" required>
+                    </div>
+                    
+                    <div class="input-group password-group">
+                        <label for="loginPassword">Password</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="loginPassword" placeholder="Enter your password" required>
+                            <button type="button" class="toggle-password" id="toggleLoginPassword">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="auth-button">Sign In</button>
+                    
+                    <div class="auth-switch">
+                        New to B-FIT? <a id="goToRegisterLink">Create Account</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Page 3: Register Page -->
+    <div class="page next" id="registerPage">
+        <div class="page-container">
+            <div class="auth-content">
+                <div class="auth-header">
+                    <!-- Register Logo -->
+                    <div class="auth-logo">
+                        <img src="assets/images/logo.png" alt="B-FIT Logo" id="registerLogo">
+                    </div>
+                    <h2>Join B-FIT</h2>
+                    <p>Start your transformation today</p>
+                </div>
+                
+                <form class="auth-form" id="registerForm">
+                    <div class="input-group">
+                        <label for="registerName">Full Name</label>
+                        <input type="text" id="registerName" placeholder="Enter your full name" required>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="registerPhone">Phone Number</label>
+                        <input type="tel" id="registerPhone" placeholder="10-digit phone number" required>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="registerGender">Gender</label>
+                        <select id="registerGender" required>
+                            <option value="">Select Gender</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="registerAge">Age</label>
+                        <input type="number" id="registerAge" placeholder="Your age" min="10" max="100">
+                    </div>
+                    
+                    <div class="input-group password-group">
+                        <label for="registerPassword">Password</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="registerPassword" placeholder="Create a password (min 6 characters)" required>
+                            <button type="button" class="toggle-password" id="toggleRegisterPassword">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="input-group password-group">
+                        <label for="registerConfirmPassword">Confirm Password</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="registerConfirmPassword" placeholder="Confirm your password" required>
+                            <button type="button" class="toggle-password" id="toggleConfirmPassword">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="auth-button">Create Account</button>
+                    
+                    <div class="auth-switch">
+                        Already have an account? <a id="goToLoginLink">Sign In</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Page 4: Loading Screen -->
+    <div class="page next" id="loadingPage">
+        <div class="page-container">
+            <div class="loading-content">
+                <!-- Loading Logo -->
+                <div class="loading-logo">
+                    <img src="assets/images/logo.png" alt="B-FIT Logo" id="loadingLogo">
+                </div>
+                <h2 class="loading-text">Preparing Your Workout...</h2>
+                <div class="loader"></div>
+                <p class="loading-subtext">Optimizing your fitness plan</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Page 5: Home/Dashboard Page -->
+    <div class="page next" id="dashboardPage">
+        <div class="page-container">
+            <!-- FIXED Header with Logo on right top -->
+            <div class="dashboard-header">
+                <div class="day-display">
+                    <div class="header-day" id="currentDay"></div>
+                </div>
+                <div class="dashboard-logo">
+                    <img src="assets/images/logo.png" alt="B-FIT Logo">
+                </div>
+            </div>
+
+            <!-- FIXED Day and Streak in one line -->
+            <div class="day-streak-container">
+                <div class="home-day" id="homeDay">Saturday</div>
+                <div class="home-streak"> <span id="currentStreakCount">0</span></div>
+            </div>
+
+            <div class="workout-title" id="todayWorkout">LEG DAY</div>
+            
+            <!-- Workout Image -->
+            <div class="workout-image-container" id="workoutImageContainer">
+                <div class="workout-image-overlay" id="workoutImageText">LEG DAY</div>
+            </div>
+            
+            <button class="start-button" id="startWorkoutBtn">
+                <i class="fas fa-play-circle"></i> START WORKOUT
+            </button>
+        </div>
+        
+        <!-- Footer for Dashboard - Fixed at bottom -->
+        <footer class="page-footer">
+            <p>Made with <i class="fas fa-heart"></i> by <strong>OBAIDULLAH SHAIKH</strong></p>
+            <div class="footer-social-links">
+                <a href="https://obaidullah-shaikh-portfolio.vercel.app/" target="_blank" title="Portfolio">
+                    <i class="fas fa-briefcase"></i>
+                </a>
+                <a href="https://www.linkedin.com/in/obaidullah-shaikh/" target="_blank" title="LinkedIn">
+                    <i class="fab fa-linkedin"></i>
+                </a>
+                <a href="https://github.com/shaikhobaid76" target="_blank" title="GitHub">
+                    <i class="fab fa-github"></i>
+                </a>
+                <a href="https://www.instagram.com/official_mr_obaid/" target="_blank" title="Instagram">
+                    <i class="fab fa-instagram"></i>
+                </a>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- Page 6: Warm-Up Page -->
+    <div class="page next" id="warmupPage">
+        <div class="page-container">
+            <div class="warmup-header">
+                <button class="back-button" id="backToDashboardBtn">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <div class="page-title">WARM-UP</div>
+                <div style="width: 50px;"></div> <!-- Spacer -->
+            </div>
+            
+            <div class="warmup-list" id="warmupExercises">
+                <!-- Warm-up exercises loaded by JS -->
+            </div>
+            
+            <button class="start-button" id="startMainWorkoutBtn">
+                <i class="fas fa-forward"></i> START MAIN WORKOUT
+            </button>
+        </div>
+    </div>
+    
+    <!-- Page 7: Workout Sets Page -->
+    <div class="page next" id="workoutSetsPage">
+        <div class="page-container">
+            <div class="warmup-header">
+                <button class="back-button" id="backToDashboardFromSetsBtn">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <div class="page-title" id="workoutSetsTitle">WORKOUT SETS</div>
+                <div style="width: 50px;"></div> <!-- Spacer -->
+            </div>
+            
+            <div class="workout-sets-container">
+                <div class="set-title" id="workoutDayTitle">LEG DAY</div>
+                <div class="sets-grid" id="workoutSetsGrid">
+                    <!-- Workout sets loaded by JS -->
+                </div>
+            </div>
+            
+            <button class="start-button" id="startWorkoutFromSetsBtn">
+                <i class="fas fa-play-circle"></i> START WORKOUT
+            </button>
+        </div>
+    </div>
+    
+    <!-- Page 8: Workout Exercises Page -->
+    <div class="page next" id="workoutPage">
+        <div class="page-container">
+            <div class="warmup-header">
+                <button class="back-button" id="backToSetsBtn">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <div class="page-title" id="workoutPageTitle">WORKOUT</div>
+                <div style="width: 50px;"></div> <!-- Spacer -->
+            </div>
+            
+            <div class="workout-progress">
+                Exercise <span id="currentExerciseIndex">1</span> of <span id="totalExercises">5</span>
+            </div>
+            
+            <div class="current-exercise-title" id="currentExerciseName">Leg Press</div>
+            <div class="exercise-details" id="currentExerciseDetails">4 × 12</div>
+            
+            <div class="exercise-media" id="exerciseVideoContainer">
+                <!-- Video will be loaded here -->
+                <video id="exerciseVideo" controls>
+                    <source id="videoSource" src="" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+            
+            <button class="youtube-btn-red" id="youtubeLinkBtn">
+                <i class="fab fa-youtube"></i> Watch Tutorial
+            </button>
+            
+            <button class="done-button" id="doneExerciseBtn">
+                <i class="fas fa-check-circle"></i> DONE
+            </button>
+        </div>
+    </div>
+    
+    <!-- Page 9: Completion Page -->
+    <div class="page next" id="completionPage">
+        <div class="page-container">
+            <div class="completion-content">
+                <div class="completion-icon">
+                    <i class="fas fa-trophy"></i>
+                </div>
+                <div class="completion-title">WORKOUT COMPLETED!</div>
+                <div class="completion-message">
+                    Amazing work! You're one step closer to your fitness goals. Keep pushing! 💪
+                </div>
+                <div class="streak-update">
+                    Your streak is now <span id="updatedStreak">1</span> days!
+                </div>
+                <button class="home-button" id="goToDashboardFromCompletionBtn">
+                    <i class="fas fa-home"></i> BACK TO HOME
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Page 10: Profile Page -->
+    <div class="page next" id="profilePage">
+        <div class="page-container">
+            <div class="warmup-header">
+                <button class="back-button" id="backToDashboardFromProfileBtn">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <div class="page-title">PROFILE</div>
+                <div style="width: 50px;"></div> <!-- Spacer -->
+            </div>
+            
+            <div class="profile-content">
+                <div class="profile-card">
+                    <div class="profile-header">
+                        <div class="profile-avatar">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="profile-details">
+                            <h2 id="profileUserName">User Name</h2>
+                            <p id="profileUserPhone">Phone Number</p>
+                        </div>
+                    </div>
+                    
+                    <div class="profile-stats">
+                        <div class="stat-card current-streak">
+                            <div class="stat-icon">
+                                <i class="fas fa-fire"></i>
+                            </div>
+                            <div class="stat-value" id="profileCurrentStreak">0</div>
+                            <div class="stat-label">Current Streak</div>
+                        </div>
+                        <div class="stat-card highest-streak">
+                            <div class="stat-icon">
+                                <i class="fas fa-trophy"></i>
+                            </div>
+                            <div class="stat-value" id="profileHighestStreak">0</div>
+                            <div class="stat-label">Highest Streak</div>
+                        </div>
+                    </div>
+                    
+                    <div class="profile-form">
+                        <div class="form-group">
+                            <label for="profileName">Full Name</label>
+                            <input type="text" id="profileName" placeholder="Your full name" disabled>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="profilePhone">Phone Number</label>
+                            <input type="tel" id="profilePhone" placeholder="Your phone number" disabled>
+                        </div>
+                        
+                        <div class="form-group gender-field">
+                            <label for="profileGender">Gender</label>
+                            <select id="profileGender">
+                                <option value="">Select Gender</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="profileAge">Age</label>
+                            <input type="number" id="profileAge" placeholder="Your age" min="10" max="100">
+                        </div>
+                        
+                        <button class="profile-button" id="saveProfileBtn">
+                            <i class="fas fa-save"></i> SAVE PROFILE
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer for Profile Page - Fixed at bottom -->
+        <footer class="page-footer">
+            <p>Made with <i class="fas fa-heart"></i> by <strong>OBAIDULLAH SHAIKH</strong></p>
+            <div class="footer-social-links">
+                <a href="https://obaidullah-shaikh-portfolio.vercel.app/" target="_blank" title="Portfolio">
+                    <i class="fas fa-briefcase"></i>
+                </a>
+                <a href="https://www.linkedin.com/in/obaidullah-shaikh/" target="_blank" title="LinkedIn">
+                    <i class="fab fa-linkedin"></i>
+                </a>
+                <a href="https://github.com/shaikhobaid76" target="_blank" title="GitHub">
+                    <i class="fab fa-github"></i>
+                </a>
+                <a href="https://www.instagram.com/official_mr_obaid/" target="_blank" title="Instagram">
+                    <i class="fab fa-instagram"></i>
+                </a>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-content">
+            <div class="sidebar-header">
+                <div class="profile-icon">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="profile-info">
+                    <div class="profile-name" id="sidebarUserName">User Name</div>
+                    <div class="profile-phone" id="sidebarUserPhone">Phone Number</div>
+                </div>
+            </div>
+            
+            <div class="sidebar-section">
+                <div class="sidebar-title">WEEKLY PLAN</div>
+                <div class="weekly-plan" id="weeklyPlan">
+                    <!-- Weekly plan loaded by JS -->
+                </div>
+            </div>
+            
+            <div class="sidebar-section">
+                <div class="sidebar-title">MENU</div>
+                <div class="sidebar-menu">
+                    <div class="menu-item" id="sidebarHomeBtn">
+                        <div class="menu-icon">
+                            <i class="fas fa-home"></i>
+                        </div>
+                        <div>Home</div>
+                    </div>
+                    <div class="menu-item" id="sidebarProfileBtn">
+                        <div class="menu-icon">
+                            <i class="fas fa-user-circle"></i>
+                        </div>
+                        <div>Profile</div>
+                    </div>
+                    <div class="menu-item" id="sidebarLogoutBtn">
+                        <div class="menu-icon">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </div>
+                        <div>Logout</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer for Sidebar -->
+        <footer class="sidebar-footer">
+            <p>Made with <i class="fas fa-heart"></i> by <strong>OBAIDULLAH SHAIKH</strong></p>
+            <div class="footer-social-links">
+                <a href="https://obaidullah-shaikh-portfolio.vercel.app/" target="_blank" title="Portfolio">
+                    <i class="fas fa-briefcase"></i>
+                </a>
+                <a href="https://www.linkedin.com/in/obaidullah-shaikh/" target="_blank" title="LinkedIn">
+                    <i class="fab fa-linkedin"></i>
+                </a>
+                <a href="https://github.com/shaikhobaid76" target="_blank" title="GitHub">
+                    <i class="fab fa-github"></i>
+                </a>
+                <a href="https://www.instagram.com/official_mr_obaid/" target="_blank" title="Instagram">
+                    <i class="fab fa-instagram"></i>
+                </a>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Countdown Timer Overlay -->
+    <div class="countdown-timer-container" id="countdownTimerContainer">
+        <div class="countdown-timer-display" id="countdownTimerDisplay">60</div>
+    </div>
+
+    <!-- Alert Modal -->
+    <div class="alert-modal" id="alertModal">
+        <div class="alert-content">
+            <div class="alert-icon" id="alertIcon">
+                <i class="fas fa-info-circle"></i>
+            </div>
+            <div class="alert-title" id="alertTitle">Information</div>
+            <div class="alert-message" id="alertMessage">This is an alert message.</div>
+            <button class="alert-button" id="alertButton">OK</button>
+        </div>
+    </div>
+
+    <!-- External JavaScript -->
+    <script src="script.js"></script>
+</body>
+</html>
