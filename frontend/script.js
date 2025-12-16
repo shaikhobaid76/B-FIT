@@ -423,13 +423,13 @@ const AppState = {
     currentExerciseIndex: 0,
     currentYoutubeLink: "",
     currentVideoLink: "",
-    selectedDayForWorkout: null // New variable to track selected day
+    selectedDayForWorkout: null
 };
 
-// API Configuration
-const API_BASE_URL = 'https://b-fit-backend-jy2e.onrender.com/api'; // Change in production  
+// ✅ CORRECTED API Configuration
+const API_BASE_URL = 'https://b-fit-backend-jy2e.onrender.com/api';
 
-// API Service Functions
+// ✅ CORRECTED API Service Functions
 const ApiService = {
     // Set token in localStorage and headers
     setToken(token) {
@@ -444,17 +444,20 @@ const ApiService = {
     // Clear token
     clearToken() {
         localStorage.removeItem('bfitToken');
+        localStorage.removeItem('bfitCurrentUser');
     },
     
-    // Make API request
+    // ✅ CORRECTED: Make API request
     async request(endpoint, method = 'GET', data = null) {
         const url = `${API_BASE_URL}${endpoint}`;
+        console.log(`🌐 API Request: ${method} ${url}`);
+        
         const headers = {
             'Content-Type': 'application/json',
         };
         
         const token = this.getToken();
-        if (token) {
+        if (token && token !== 'offline-token') {
             headers['Authorization'] = `Bearer ${token}`;
         }
         
@@ -463,69 +466,291 @@ const ApiService = {
             headers,
         };
         
-        if (data) {
+        if (data && method !== 'GET') {
             config.body = JSON.stringify(data);
         }
         
         try {
             const response = await fetch(url, config);
-            const result = await response.json();
             
+            // If response is not OK, throw error
             if (!response.ok) {
-                throw new Error(result.message || 'API request failed');
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
             }
+            
+            const result = await response.json();
+            console.log(`✅ API Response from ${endpoint}:`, result);
             
             return result;
         } catch (error) {
-            console.error('API Error:', error);
-            throw error;
+            console.error(`❌ API Error at ${endpoint}:`, error.message);
+            
+            // If it's a network error (backend down), use offline mode
+            if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                console.log('🔌 Backend offline, using local storage');
+                throw new Error('Backend is offline. Using local storage mode.');
+            }
+            
+            throw new Error(error.message || 'API request failed');
         }
     },
     
-    // Auth endpoints
+    // ✅ CORRECTED: Auth endpoints
     async register(userData) {
-        return await this.request('/auth/register', 'POST', userData);
+        try {
+            const result = await this.request('/auth/register', 'POST', userData);
+            
+            // Save user to local storage as fallback
+            localStorage.setItem('bfitCurrentUser', JSON.stringify({
+                ...userData,
+                _id: result.userId || 'local-id'
+            }));
+            
+            // For offline mode, create a fake token
+            this.setToken('offline-token');
+            
+            return {
+                token: 'offline-token',
+                user: {
+                    _id: result.userId || 'local-id',
+                    name: userData.name,
+                    phone: userData.phone,
+                    gender: userData.gender,
+                    age: userData.age
+                }
+            };
+        } catch (error) {
+            console.log('API register failed, using local storage');
+            
+            // Save to local storage
+            const users = JSON.parse(localStorage.getItem('bfitUsers')) || [];
+            users.push(userData);
+            localStorage.setItem('bfitUsers', JSON.stringify(users));
+            
+            // Save as current user
+            localStorage.setItem('bfitCurrentUser', JSON.stringify(userData));
+            
+            // Set offline token
+            this.setToken('offline-token');
+            
+            return {
+                token: 'offline-token',
+                user: {
+                    _id: 'local-id-' + Date.now(),
+                    name: userData.name,
+                    phone: userData.phone,
+                    gender: userData.gender,
+                    age: userData.age
+                }
+            };
+        }
     },
     
     async login(phone, password) {
-        return await this.request('/auth/login', 'POST', { phone, password });
+        try {
+            const result = await this.request('/auth/login', 'POST', { phone, password });
+            
+            // Save user to local storage
+            localStorage.setItem('bfitCurrentUser', JSON.stringify(result.user));
+            
+            // For offline mode, use fake token
+            this.setToken('offline-token');
+            
+            return {
+                token: 'offline-token',
+                user: result.user,
+                streak: result.streak
+            };
+        } catch (error) {
+            console.log('API login failed, trying local storage');
+            
+            // Fallback to local storage
+            const users = JSON.parse(localStorage.getItem('bfitUsers')) || [];
+            const user = users.find(u => u.phone === phone && u.password === password);
+            
+            if (!user) {
+                throw new Error('Invalid phone number or password');
+            }
+            
+            // Save as current user
+            localStorage.setItem('bfitCurrentUser', JSON.stringify(user));
+            this.setToken('offline-token');
+            
+            // Get streak from local storage
+            const savedStreak = localStorage.getItem('bfitCurrentStreak');
+            const savedHighestStreak = localStorage.getItem('bfitHighestStreak');
+            
+            return {
+                token: 'offline-token',
+                user: {
+                    _id: 'local-id',
+                    name: user.name,
+                    phone: user.phone,
+                    gender: user.gender,
+                    age: user.age
+                },
+                streak: {
+                    currentStreak: savedStreak ? parseInt(savedStreak) : 0,
+                    highestStreak: savedHighestStreak ? parseInt(savedHighestStreak) : 0
+                }
+            };
+        }
     },
     
     async getProfile() {
-        return await this.request('/auth/profile', 'GET');
+        try {
+            // Try API first
+            const currentUser = JSON.parse(localStorage.getItem('bfitCurrentUser') || '{}');
+            if (currentUser && currentUser.phone) {
+                return {
+                    user: currentUser
+                };
+            }
+            
+            // If no local user, use API
+            const result = await this.request('/auth/profile', 'GET');
+            return result;
+        } catch (error) {
+            console.log('Getting profile from local storage');
+            
+            // Get from local storage
+            const user = JSON.parse(localStorage.getItem('bfitCurrentUser') || '{}');
+            const profileData = JSON.parse(localStorage.getItem('bfitProfileData') || '{}');
+            
+            return {
+                user: {
+                    ...user,
+                    ...profileData
+                }
+            };
+        }
     },
     
     async updateProfile(profileData) {
-        return await this.request('/auth/profile', 'PUT', profileData);
+        try {
+            const result = await this.request('/auth/profile', 'PUT', profileData);
+            
+            // Update local storage
+            const currentUser = JSON.parse(localStorage.getItem('bfitCurrentUser') || '{}');
+            const updatedUser = { ...currentUser, ...profileData };
+            localStorage.setItem('bfitCurrentUser', JSON.stringify(updatedUser));
+            localStorage.setItem('bfitProfileData', JSON.stringify(profileData));
+            
+            return {
+                user: updatedUser
+            };
+        } catch (error) {
+            console.log('Saving profile to local storage');
+            
+            // Save to local storage
+            const currentUser = JSON.parse(localStorage.getItem('bfitCurrentUser') || '{}');
+            const updatedUser = { ...currentUser, ...profileData };
+            localStorage.setItem('bfitCurrentUser', JSON.stringify(updatedUser));
+            localStorage.setItem('bfitProfileData', JSON.stringify(profileData));
+            
+            return {
+                user: updatedUser
+            };
+        }
     },
     
-    // Workout endpoints
-    async getTodaysWorkout() {
-        return await this.request('/workout/today', 'GET');
-    },
-    
-    async getWorkoutByDay(dayIndex) {
-        return await this.request(`/workout/day/${dayIndex}`, 'GET');
-    },
-    
-    async completeWorkout(workoutId, duration) {
-        return await this.request('/workout/complete', 'POST', { 
-            workoutId, 
-            duration 
-        });
-    },
-    
-    // Streak endpoints
-    async getStreak() {
-        return await this.request('/streak', 'GET');
-    },
-    
+    // ✅ CORRECTED: Streak endpoints
     async updateStreak() {
-        return await this.request('/streak/update', 'POST');
+        try {
+            const result = await this.request('/streak/update', 'POST', {
+                userId: 'local-user-id'
+            });
+            
+            // Update local storage
+            localStorage.setItem('bfitCurrentStreak', result.streak.currentStreak);
+            localStorage.setItem('bfitHighestStreak', result.streak.highestStreak);
+            localStorage.setItem('bfitLastWorkoutDate', new Date().toDateString());
+            
+            return {
+                streak: result.streak
+            };
+        } catch (error) {
+            console.log('Updating streak locally');
+            
+            // Update streak locally
+            const now = new Date();
+            const today = now.toDateString();
+            
+            // Don't update streak on Sunday
+            if (now.getDay() === 0) {
+                return {
+                    streak: {
+                        currentStreak: AppState.currentStreak,
+                        highestStreak: AppState.highestStreak
+                    }
+                };
+            }
+            
+            const lastWorkoutDate = localStorage.getItem('bfitLastWorkoutDate');
+            let currentStreak = parseInt(localStorage.getItem('bfitCurrentStreak') || '0');
+            let highestStreak = parseInt(localStorage.getItem('bfitHighestStreak') || '0');
+            
+            if (!lastWorkoutDate) {
+                // First workout
+                currentStreak = 1;
+            } else {
+                const lastDate = new Date(lastWorkoutDate);
+                const diffTime = Math.abs(now - lastDate);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                
+                if (diffDays === 1) {
+                    // Worked out yesterday
+                    currentStreak++;
+                } else if (diffDays > 1) {
+                    // Missed a day, reset streak
+                    currentStreak = 1;
+                }
+            }
+            
+            // Update highest streak if current is higher
+            if (currentStreak > highestStreak) {
+                highestStreak = currentStreak;
+            }
+            
+            // Save to localStorage
+            localStorage.setItem('bfitCurrentStreak', currentStreak);
+            localStorage.setItem('bfitHighestStreak', highestStreak);
+            localStorage.setItem('bfitLastWorkoutDate', today);
+            
+            // Update AppState
+            AppState.currentStreak = currentStreak;
+            AppState.highestStreak = highestStreak;
+            
+            return {
+                streak: {
+                    currentStreak: currentStreak,
+                    highestStreak: highestStreak,
+                    workoutCount: 1
+                }
+            };
+        }
     },
     
-    async getStreakHistory() {
-        return await this.request('/streak/history', 'GET');
+    async getStreak() {
+        try {
+            const result = await this.request('/streak/local-user-id', 'GET');
+            return result;
+        } catch (error) {
+            console.log('Getting streak from local storage');
+            
+            // Get from local storage
+            const currentStreak = parseInt(localStorage.getItem('bfitCurrentStreak') || '0');
+            const highestStreak = parseInt(localStorage.getItem('bfitHighestStreak') || '0');
+            
+            return {
+                streak: {
+                    currentStreak: currentStreak,
+                    highestStreak: highestStreak,
+                    workoutCount: 0
+                }
+            };
+        }
     }
 };
 
@@ -581,7 +806,6 @@ function hideAlert() {
 
 // Navigation Functions
 function navigateTo(pageName) {
-    // Don't navigate if already on this page
     if (AppState.currentPage === pageName) {
         return;
     }
@@ -594,7 +818,6 @@ function navigateTo(pageName) {
         return;
     }
     
-    // Update classes for smooth transition
     if (currentPage) {
         currentPage.classList.remove('active');
         currentPage.classList.add('previous');
@@ -603,7 +826,6 @@ function navigateTo(pageName) {
     nextPage.classList.remove('next', 'previous');
     nextPage.classList.add('active');
     
-    // Reset other pages
     Object.keys(pages).forEach(key => {
         if (key !== pageName && key !== AppState.currentPage) {
             const page = pages[key];
@@ -612,22 +834,16 @@ function navigateTo(pageName) {
         }
     });
     
-    // Update state
     AppState.currentPage = pageName;
     
-    // Update hamburger button visibility
     updateHamburgerVisibility();
-    
-    // Update back button visibility
     updateBackButtonVisibility();
     
-    // Page-specific initialization
     initializePage(pageName);
 }
 
 function updateHamburgerVisibility() {
     const hamburgerBtn = document.getElementById('hamburgerBtn');
-    // Show hamburger only on dashboard, profile, and workout sets pages
     if (AppState.currentPage === 'dashboard' || AppState.currentPage === 'profile' || 
         AppState.currentPage === 'warmup' || AppState.currentPage === 'workoutSets' || 
         AppState.currentPage === 'workout' || AppState.currentPage === 'completion') {
@@ -639,10 +855,10 @@ function updateHamburgerVisibility() {
 }
 
 function updateBackButtonVisibility() {
-    // Show back button only on warmup, workout sets, and workout pages
     const backButtons = document.querySelectorAll('.back-button');
     backButtons.forEach(btn => {
-        if (AppState.currentPage === 'warmup' || AppState.currentPage === 'workoutSets' || AppState.currentPage === 'workout' || AppState.currentPage === 'profile') {
+        if (AppState.currentPage === 'warmup' || AppState.currentPage === 'workoutSets' || 
+            AppState.currentPage === 'workout' || AppState.currentPage === 'profile') {
             btn.style.visibility = 'visible';
         } else {
             btn.style.visibility = 'hidden';
@@ -678,7 +894,6 @@ function updateDateTime() {
     const now = new Date();
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     
-    // Update day display on dashboard
     const homeDayElement = document.getElementById('homeDay');
     if (homeDayElement) {
         AppState.currentDay = now.getDay();
@@ -686,54 +901,60 @@ function updateDateTime() {
     }
 }
 
-// Dashboard Functions
+// ✅ CORRECTED: Dashboard Functions
 async function updateDashboard() {
     try {
-        // Load user profile if logged in
-        if (ApiService.getToken()) {
+        console.log('Updating dashboard...');
+        
+        // Load from local storage first (for immediate display)
+        loadFromLocalStorage();
+        
+        // Try to load from API if token exists
+        if (ApiService.getToken() && ApiService.getToken() !== 'offline-token') {
             try {
                 const profileResult = await ApiService.getProfile();
-                AppState.user = profileResult.user;
+                if (profileResult.user) {
+                    AppState.user = profileResult.user;
+                    
+                    // Update sidebar
+                    const sidebarName = document.getElementById('sidebarUserName');
+                    const sidebarPhone = document.getElementById('sidebarUserPhone');
+                    if (sidebarName) sidebarName.textContent = AppState.user.name || 'User';
+                    if (sidebarPhone) sidebarPhone.textContent = AppState.user.phone || 'N/A';
+                }
                 
                 // Load streak from API
                 const streakResult = await ApiService.getStreak();
-                AppState.currentStreak = streakResult.streak.currentStreak;
-                AppState.highestStreak = streakResult.streak.highestStreak;
-                
-                // Update streak display
-                const currentStreakElement = document.getElementById('currentStreakCount');
-                if (currentStreakElement) {
-                    currentStreakElement.textContent = AppState.currentStreak;
+                if (streakResult.streak) {
+                    AppState.currentStreak = streakResult.streak.currentStreak || 0;
+                    AppState.highestStreak = streakResult.streak.highestStreak || 0;
+                    
+                    // Update streak display
+                    const currentStreakElement = document.getElementById('currentStreakCount');
+                    if (currentStreakElement) {
+                        currentStreakElement.textContent = AppState.currentStreak;
+                    }
                 }
-                
-                // Update sidebar user info
-                document.getElementById('sidebarUserName').textContent = AppState.user.name;
-                document.getElementById('sidebarUserPhone').textContent = AppState.user.phone;
             } catch (apiError) {
-                console.log('Using local storage for offline mode');
-                // Fallback to localStorage if API fails
-                loadFromLocalStorage();
+                console.log('API failed, using local storage:', apiError.message);
             }
-        } else {
-            // Use localStorage if no API token
-            loadFromLocalStorage();
         }
         
         // Load weekly plan for sidebar
         loadWeeklyPlan();
         
-        // Update today's workout based on day
+        // Update today's workout
         updateTodaysWorkout();
         
         // Update day
         updateDateTime();
         
-        // Update workout image (only for current day)
+        // Update workout image
         updateWorkoutImage();
         
     } catch (error) {
         console.error('Dashboard update error:', error);
-        // Fallback to localStorage on error
+        // Fallback
         loadFromLocalStorage();
         updateTodaysWorkout();
         updateDateTime();
@@ -757,11 +978,19 @@ function loadFromLocalStorage() {
     }
     
     // Load current user if exists
-    const savedUser = localStorage.getItem('bfitCurrentUser');
-    if (savedUser) {
-        AppState.user = JSON.parse(savedUser);
-        document.getElementById('sidebarUserName').textContent = AppState.user.name;
-        document.getElementById('sidebarUserPhone').textContent = AppState.user.phone;
+    try {
+        const savedUser = localStorage.getItem('bfitCurrentUser');
+        if (savedUser) {
+            AppState.user = JSON.parse(savedUser);
+            
+            // Update sidebar
+            const sidebarName = document.getElementById('sidebarUserName');
+            const sidebarPhone = document.getElementById('sidebarUserPhone');
+            if (sidebarName) sidebarName.textContent = AppState.user.name || 'User';
+            if (sidebarPhone) sidebarPhone.textContent = AppState.user.phone || 'N/A';
+        }
+    } catch (e) {
+        console.log('Error parsing user from localStorage:', e);
     }
 }
 
@@ -785,7 +1014,6 @@ function updateWorkoutImage() {
     
     if (workout && workout.title) {
         imageText.textContent = workout.title;
-        // Set background image
         const imagePath = AppState.workoutImages[AppState.currentWorkoutDay] || "assets/images/saturday.jpg";
         imageContainer.style.background = `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('${imagePath}')`;
         imageContainer.style.backgroundSize = 'cover';
@@ -829,7 +1057,6 @@ function loadWeeklyPlan() {
     
     weeklyPlanContainer.innerHTML = '';
     
-    // Update current day in weekly plan
     AppState.weeklyPlan.forEach(dayPlan => {
         dayPlan.current = (dayPlan.dayIndex === AppState.currentDay);
     });
@@ -847,7 +1074,6 @@ function loadWeeklyPlan() {
             <div>${dayPlan.workout}</div>
         `;
         
-        // Add click event to navigate to workout sets for that day
         dayItem.addEventListener('click', function() {
             const dayIndex = parseInt(this.dataset.dayIndex);
             startWorkoutForDay(dayIndex);
@@ -859,7 +1085,7 @@ function loadWeeklyPlan() {
 }
 
 function startWorkoutForDay(dayIndex) {
-    if (dayIndex === 0) { // Sunday - Rest day
+    if (dayIndex === 0) {
         showAlert("Rest Day", "Today is rest day! No workout scheduled. Take this day to recover and rejuvenate.", "info");
         return;
     }
@@ -873,13 +1099,11 @@ function startWorkoutForDay(dayIndex) {
     AppState.selectedDayForWorkout = dayIndex;
     AppState.currentWorkoutDay = dayIndex;
     
-    // Navigate to workout sets page
     navigateTo('workoutSets');
 }
 
 // Workout Sets Page Functions
 function loadWorkoutSetsPage() {
-    // Use selected day or current day
     const dayToLoad = AppState.selectedDayForWorkout !== null ? AppState.selectedDayForWorkout : AppState.currentWorkoutDay;
     const workout = AppState.weeklyWorkouts[dayToLoad];
     const sets = AppState.workoutSets[dayToLoad];
@@ -890,11 +1114,9 @@ function loadWorkoutSetsPage() {
         return;
     }
     
-    // Update page title
     document.getElementById('workoutSetsTitle').textContent = workout.day.toUpperCase();
     document.getElementById('workoutDayTitle').textContent = workout.title;
     
-    // Load sets
     const setsGrid = document.getElementById('workoutSetsGrid');
     setsGrid.innerHTML = '';
     
@@ -942,11 +1164,9 @@ function loadWorkoutExercise() {
     document.getElementById('totalExercises').textContent = workout.exercises.length;
     document.getElementById('workoutPageTitle').textContent = workout.day.toUpperCase();
     
-    // Store YouTube link
     AppState.currentYoutubeLink = exercise.youtubeLink;
     AppState.currentVideoLink = exercise.video || AppState.workoutVideos[exercise.name];
     
-    // Load video
     const videoContainer = document.getElementById('exerciseVideoContainer');
     const video = document.getElementById('exerciseVideo');
     const videoSource = document.getElementById('videoSource');
@@ -956,7 +1176,6 @@ function loadWorkoutExercise() {
         video.load();
         video.play().catch(e => {
             console.log("Video autoplay prevented:", e);
-            // Show play button overlay
             videoContainer.innerHTML = `
                 <div class="video-placeholder" id="videoPlaceholder">
                     <i class="fas fa-play-circle"></i>
@@ -987,14 +1206,12 @@ function startCountdown() {
     const countdownContainer = document.getElementById('countdownTimerContainer');
     const countdownDisplay = document.getElementById('countdownTimerDisplay');
     
-    // Show countdown overlay
     countdownContainer.style.display = 'flex';
     countdownContainer.classList.add('active');
     
     let timeLeft = 60;
     countdownDisplay.textContent = timeLeft;
     
-    // Clear any existing interval
     if (AppState.countdownInterval) {
         clearInterval(AppState.countdownInterval);
     }
@@ -1008,7 +1225,6 @@ function startCountdown() {
             countdownContainer.classList.remove('active');
             countdownContainer.style.display = 'none';
             
-            // Move to next exercise
             const dayToLoad = AppState.selectedDayForWorkout !== null ? AppState.selectedDayForWorkout : AppState.currentWorkoutDay;
             const workout = AppState.weeklyWorkouts[dayToLoad];
             AppState.currentExerciseIndex++;
@@ -1016,120 +1232,78 @@ function startCountdown() {
             if (AppState.currentExerciseIndex < workout.exercises.length) {
                 loadWorkoutExercise();
             } else {
-                // Workout completed
                 AppState.currentExerciseIndex = 0;
-                
-                // Update streak
                 updateStreak();
-                
                 navigateTo('completion');
             }
         }
     }, 1000);
 }
 
+// ✅ CORRECTED: Update Streak Function
 async function updateStreak() {
     try {
-        if (ApiService.getToken()) {
-            // Update streak via API
-            const result = await ApiService.updateStreak();
-            AppState.currentStreak = result.streak.currentStreak;
-            AppState.highestStreak = result.streak.highestStreak;
-        } else {
-            // Update streak locally
-            const now = new Date();
-            const today = now.toDateString();
-            
-            // Don't update streak on Sunday (day 0)
-            if (now.getDay() === 0) {
-                return;
-            }
-            
-            const lastWorkoutDate = localStorage.getItem('bfitLastWorkoutDate');
-            
-            if (!lastWorkoutDate) {
-                // First workout
-                AppState.currentStreak = 1;
-            } else {
-                const lastDate = new Date(lastWorkoutDate);
-                const diffTime = Math.abs(now - lastDate);
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                
-                if (diffDays === 1) {
-                    // Worked out yesterday
-                    AppState.currentStreak++;
-                } else if (diffDays > 1) {
-                    // Missed a day, reset streak
-                    AppState.currentStreak = 1;
-                }
-                // If diffDays is 0, already worked out today, don't update
-            }
-            
-            // Update highest streak if current is higher
-            if (AppState.currentStreak > AppState.highestStreak) {
-                AppState.highestStreak = AppState.currentStreak;
-            }
-            
-            // Save to localStorage
-            localStorage.setItem('bfitCurrentStreak', AppState.currentStreak);
-            localStorage.setItem('bfitHighestStreak', AppState.highestStreak);
-            localStorage.setItem('bfitLastWorkoutDate', today);
+        // Always update locally first for immediate feedback
+        const now = new Date();
+        const today = now.toDateString();
+        
+        // Don't update streak on Sunday
+        if (now.getDay() === 0) {
+            console.log('Sunday - no streak update');
+            return;
         }
+        
+        const lastWorkoutDate = localStorage.getItem('bfitLastWorkoutDate');
+        let currentStreak = parseInt(localStorage.getItem('bfitCurrentStreak') || '0');
+        let highestStreak = parseInt(localStorage.getItem('bfitHighestStreak') || '0');
+        
+        if (!lastWorkoutDate) {
+            currentStreak = 1;
+        } else {
+            const lastDate = new Date(lastWorkoutDate);
+            const diffTime = Math.abs(now - lastDate);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays === 1) {
+                currentStreak++;
+            } else if (diffDays > 1) {
+                currentStreak = 1;
+            }
+        }
+        
+        if (currentStreak > highestStreak) {
+            highestStreak = currentStreak;
+        }
+        
+        // Update local storage
+        localStorage.setItem('bfitCurrentStreak', currentStreak);
+        localStorage.setItem('bfitHighestStreak', highestStreak);
+        localStorage.setItem('bfitLastWorkoutDate', today);
+        
+        // Update AppState
+        AppState.currentStreak = currentStreak;
+        AppState.highestStreak = highestStreak;
         
         // Update dashboard display
         const currentStreakElement = document.getElementById('currentStreakCount');
         if (currentStreakElement) {
-            currentStreakElement.textContent = AppState.currentStreak;
+            currentStreakElement.textContent = currentStreak;
         }
+        
+        console.log(`✅ Streak updated: ${currentStreak} days (Highest: ${highestStreak})`);
+        
+        // Try to sync with API in background
+        try {
+            if (ApiService.getToken() && ApiService.getToken() !== 'offline-token') {
+                await ApiService.updateStreak();
+                console.log('✅ Streak synced with API');
+            }
+        } catch (apiError) {
+            console.log('❌ API sync failed, using local storage only');
+        }
+        
     } catch (error) {
         console.error('Streak update error:', error);
-        // Fallback to local update
-        updateStreakLocally();
-    }
-}
-
-function updateStreakLocally() {
-    const now = new Date();
-    const today = now.toDateString();
-    
-    // Don't update streak on Sunday (day 0)
-    if (now.getDay() === 0) {
-        return;
-    }
-    
-    const lastWorkoutDate = localStorage.getItem('bfitLastWorkoutDate');
-    
-    if (!lastWorkoutDate) {
-        // First workout
-        AppState.currentStreak = 1;
-    } else {
-        const lastDate = new Date(lastWorkoutDate);
-        const diffTime = Math.abs(now - lastDate);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
-        if (diffDays === 1) {
-            // Worked out yesterday
-            AppState.currentStreak++;
-        } else if (diffDays > 1) {
-            // Missed a day, reset streak
-            AppState.currentStreak = 1;
-        }
-    }
-    
-    // Update highest streak if current is higher
-    if (AppState.currentStreak > AppState.highestStreak) {
-        AppState.highestStreak = AppState.currentStreak;
-    }
-    
-    // Save to localStorage
-    localStorage.setItem('bfitCurrentStreak', AppState.currentStreak);
-    localStorage.setItem('bfitHighestStreak', AppState.highestStreak);
-    localStorage.setItem('bfitLastWorkoutDate', today);
-    
-    // Update dashboard display
-    const currentStreakElement = document.getElementById('currentStreakCount');
-    if (currentStreakElement) {
-        currentStreakElement.textContent = AppState.currentStreak;
     }
 }
 
@@ -1137,44 +1311,43 @@ function updateCompletionPage() {
     document.getElementById('updatedStreak').textContent = AppState.currentStreak;
 }
 
-// Profile Functions
+// ✅ CORRECTED: Profile Functions
 async function loadProfilePage() {
     try {
-        // Load user data from API if available
-        if (ApiService.getToken()) {
+        // Try to load from API first
+        if (ApiService.getToken() && ApiService.getToken() !== 'offline-token') {
             try {
                 const profileResult = await ApiService.getProfile();
-                AppState.user = profileResult.user;
-                
-                document.getElementById('profileUserName').textContent = AppState.user.name;
-                document.getElementById('profileUserPhone').textContent = AppState.user.phone;
-                document.getElementById('profileName').value = AppState.user.name;
-                document.getElementById('profilePhone').value = AppState.user.phone;
-                document.getElementById('profileAge').value = AppState.user.age || '';
-                document.getElementById('profileGender').value = AppState.user.gender || '';
-                
-                // Load streak from API
-                const streakResult = await ApiService.getStreak();
-                document.getElementById('profileCurrentStreak').textContent = streakResult.streak.currentStreak;
-                document.getElementById('profileHighestStreak').textContent = streakResult.streak.highestStreak;
-                
-                return;
+                if (profileResult.user) {
+                    AppState.user = profileResult.user;
+                    
+                    document.getElementById('profileUserName').textContent = AppState.user.name || 'User';
+                    document.getElementById('profileUserPhone').textContent = AppState.user.phone || 'N/A';
+                    document.getElementById('profileName').value = AppState.user.name || '';
+                    document.getElementById('profilePhone').value = AppState.user.phone || '';
+                    document.getElementById('profileAge').value = AppState.user.age || '';
+                    document.getElementById('profileGender').value = AppState.user.gender || '';
+                }
             } catch (apiError) {
-                console.log('Falling back to localStorage for profile');
+                console.log('API profile load failed:', apiError.message);
             }
         }
         
         // Fallback to localStorage
-        if (AppState.user) {
-            document.getElementById('profileUserName').textContent = AppState.user.name;
-            document.getElementById('profileUserPhone').textContent = AppState.user.phone;
-            document.getElementById('profileName').value = AppState.user.name;
-            document.getElementById('profilePhone').value = AppState.user.phone;
+        if (!AppState.user) {
+            const savedUser = localStorage.getItem('bfitCurrentUser');
+            const profileData = JSON.parse(localStorage.getItem('bfitProfileData') || '{}');
             
-            // Load additional profile data
-            const profileData = JSON.parse(localStorage.getItem('bfitProfileData')) || {};
-            document.getElementById('profileAge').value = profileData.age || '';
-            document.getElementById('profileGender').value = profileData.gender || '';
+            if (savedUser) {
+                AppState.user = JSON.parse(savedUser);
+                
+                document.getElementById('profileUserName').textContent = AppState.user.name || 'User';
+                document.getElementById('profileUserPhone').textContent = AppState.user.phone || 'N/A';
+                document.getElementById('profileName').value = AppState.user.name || '';
+                document.getElementById('profilePhone').value = AppState.user.phone || '';
+                document.getElementById('profileAge').value = profileData.age || '';
+                document.getElementById('profileGender').value = profileData.gender || '';
+            }
         }
         
         // Update streak stats
@@ -1194,39 +1367,49 @@ async function saveProfileData() {
             gender: document.getElementById('profileGender').value
         };
         
-        if (ApiService.getToken()) {
-            // Save via API
-            const result = await ApiService.updateProfile(profileData);
-            showAlert("Profile Saved", "Your profile has been saved successfully!", "success");
-            
-            // Update AppState
-            AppState.user = result.user;
-        } else {
-            // Save locally
-            localStorage.setItem('bfitProfileData', JSON.stringify(profileData));
-            
-            // Update AppState user data
-            if (AppState.user) {
-                AppState.user.name = profileData.name;
-                AppState.user.age = profileData.age;
-                AppState.user.gender = profileData.gender;
-                
-                // Save updated user to localStorage
-                localStorage.setItem('bfitCurrentUser', JSON.stringify(AppState.user));
-            }
-            
-            showAlert("Profile Saved", "Your profile has been saved successfully!", "success");
+        if (!profileData.name) {
+            showAlert("Validation Error", "Name is required", "error");
+            return;
         }
+        
+        // Save to API
+        if (ApiService.getToken() && ApiService.getToken() !== 'offline-token') {
+            try {
+                const result = await ApiService.updateProfile(profileData);
+                AppState.user = result.user;
+                showAlert("Profile Saved", "Your profile has been saved to the server!", "success");
+            } catch (apiError) {
+                console.log('API save failed, saving locally');
+            }
+        }
+        
+        // Always save locally
+        const currentUser = JSON.parse(localStorage.getItem('bfitCurrentUser') || '{}');
+        const updatedUser = { ...currentUser, ...profileData };
+        localStorage.setItem('bfitCurrentUser', JSON.stringify(updatedUser));
+        localStorage.setItem('bfitProfileData', JSON.stringify(profileData));
+        
+        // Update AppState
+        AppState.user = updatedUser;
+        
+        // Update sidebar
+        const sidebarName = document.getElementById('sidebarUserName');
+        const sidebarPhone = document.getElementById('sidebarUserPhone');
+        if (sidebarName) sidebarName.textContent = updatedUser.name;
+        if (sidebarPhone) sidebarPhone.textContent = updatedUser.phone || 'N/A';
+        
+        showAlert("Profile Saved", "Your profile has been saved successfully!", "success");
+        
     } catch (error) {
-        showAlert("Save Failed", error.message, "error");
+        console.error('Save profile error:', error);
+        showAlert("Save Failed", "Could not save profile. Please try again.", "error");
     }
 }
 
-// User Management
-function saveUser(user) {
+// ✅ CORRECTED: Local Storage User Management
+function saveUserToLocal(user) {
     let users = JSON.parse(localStorage.getItem('bfitUsers')) || [];
     
-    // Check if user already exists
     const existingUserIndex = users.findIndex(u => u.phone === user.phone);
     if (existingUserIndex !== -1) {
         users[existingUserIndex] = user;
@@ -1237,14 +1420,23 @@ function saveUser(user) {
     localStorage.setItem('bfitUsers', JSON.stringify(users));
     localStorage.setItem('bfitCurrentUser', JSON.stringify(user));
     
+    // Save profile data separately
+    const profileData = {
+        gender: user.gender,
+        age: user.age
+    };
+    localStorage.setItem('bfitProfileData', JSON.stringify(profileData));
+    
     AppState.user = user;
     
     // Update sidebar
-    document.getElementById('sidebarUserName').textContent = user.name;
-    document.getElementById('sidebarUserPhone').textContent = user.phone;
+    const sidebarName = document.getElementById('sidebarUserName');
+    const sidebarPhone = document.getElementById('sidebarUserPhone');
+    if (sidebarName) sidebarName.textContent = user.name;
+    if (sidebarPhone) sidebarPhone.textContent = user.phone;
 }
 
-function loginUser(phone, password) {
+function loginUserFromLocal(phone, password) {
     const users = JSON.parse(localStorage.getItem('bfitUsers')) || [];
     const user = users.find(u => u.phone === phone && u.password === password);
     
@@ -1253,8 +1445,10 @@ function loginUser(phone, password) {
         AppState.user = user;
         
         // Update sidebar
-        document.getElementById('sidebarUserName').textContent = user.name;
-        document.getElementById('sidebarUserPhone').textContent = user.phone;
+        const sidebarName = document.getElementById('sidebarUserName');
+        const sidebarPhone = document.getElementById('sidebarUserPhone');
+        if (sidebarName) sidebarName.textContent = user.name;
+        if (sidebarPhone) sidebarPhone.textContent = user.phone;
         
         return true;
     }
@@ -1311,9 +1505,11 @@ function initializePasswordToggles() {
     }
 }
 
-// Event Listeners
+// ✅ CORRECTED: Event Listeners
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize countdown timer - hide by default
+    console.log('B-FIT App Initializing...');
+    
+    // Initialize countdown timer
     initializeCountdownTimer();
     
     // Initialize password toggles
@@ -1338,14 +1534,6 @@ document.addEventListener('DOMContentLoaded', function() {
         AppState.highestStreak = parseInt(savedHighestStreak);
     }
     
-    // Load current user if exists
-    const savedUser = localStorage.getItem('bfitCurrentUser');
-    if (savedUser) {
-        AppState.user = JSON.parse(savedUser);
-        document.getElementById('sidebarUserName').textContent = AppState.user.name;
-        document.getElementById('sidebarUserPhone').textContent = AppState.user.phone;
-    }
-    
     // Initially hide hamburger button
     document.getElementById('hamburgerBtn').style.display = 'none';
     
@@ -1361,18 +1549,16 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('getStartedBtn').addEventListener('click', function() {
         const currentUser = localStorage.getItem('bfitCurrentUser');
         if (currentUser) {
-            // User is logged in, go to loading then dashboard
             navigateTo('loading');
             setTimeout(() => {
                 navigateTo('dashboard');
-            }, 2000);
+            }, 1500);
         } else {
-            // No user, go to login page
             navigateTo('login');
         }
     });
     
-    // Register Page - Updated with API integration
+    // ✅ CORRECTED: Register Form
     document.getElementById('registerForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
@@ -1383,7 +1569,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const password = document.getElementById('registerPassword').value;
         const confirmPassword = document.getElementById('registerConfirmPassword').value;
         
-        // Simple validation
+        // Validation
         if (name.length < 2) {
             showAlert("Validation Error", "Name must be at least 2 characters long", "warning");
             return;
@@ -1409,90 +1595,103 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        // Show loading
+        showAlert("Registering", "Creating your account...", "info");
+        
         try {
-            // Try to register via API first
-            const userData = { name, phone, password, gender, age: age || null };
-            const result = await ApiService.register(userData);
-            
-            // Save token and user data
-            ApiService.setToken(result.token);
-            AppState.user = result.user;
-            
-            // Update sidebar
-            document.getElementById('sidebarUserName').textContent = result.user.name;
-            document.getElementById('sidebarUserPhone').textContent = result.user.phone;
-            
-            // Show loading and then go to dashboard
-            navigateTo('loading');
-            setTimeout(() => {
-                navigateTo('dashboard');
-            }, 2000);
-            
-        } catch (apiError) {
-            console.log('API registration failed, using local storage');
-            
-            // Fallback to local storage registration
-            const user = {
-                name,
-                phone,
-                gender,
-                age,
-                password,
-                registeredAt: new Date().toISOString()
+            const userData = { 
+                name, 
+                phone, 
+                password, 
+                gender, 
+                age: age || null 
             };
             
-            saveUser(user);
+            // Try API registration
+            const result = await ApiService.register(userData);
             
-            // Save profile data
-            const profileData = { gender, age };
-            localStorage.setItem('bfitProfileData', JSON.stringify(profileData));
+            hideAlert();
+            showAlert("Success", "Account created successfully!", "success");
             
-            // Show loading and then go to dashboard
-            navigateTo('loading');
+            // Save to local storage as fallback
+            saveUserToLocal(userData);
+            
+            // Set token (offline mode)
+            ApiService.setToken('offline-token');
+            
+            // Update AppState
+            AppState.user = result.user;
+            
+            // Navigate to dashboard
             setTimeout(() => {
-                navigateTo('dashboard');
-            }, 2000);
+                hideAlert();
+                navigateTo('loading');
+                setTimeout(() => {
+                    navigateTo('dashboard');
+                }, 1500);
+            }, 1500);
+            
+        } catch (error) {
+            console.error('Registration error:', error);
+            hideAlert();
+            showAlert("Registration Failed", "Could not create account. Please try again.", "error");
         }
     });
     
-    // Login Page - Updated with API integration
+    // ✅ CORRECTED: Login Form
     document.getElementById('loginForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
         const phone = document.getElementById('loginPhone').value.trim();
         const password = document.getElementById('loginPassword').value;
         
+        if (!phone || !password) {
+            showAlert("Validation Error", "Please enter phone and password", "warning");
+            return;
+        }
+        
+        // Show loading
+        showAlert("Logging In", "Please wait...", "info");
+        
         try {
-            // Try to login via API first
+            // Try API login
             const result = await ApiService.login(phone, password);
             
-            // Save token and user data
-            ApiService.setToken(result.token);
+            hideAlert();
+            showAlert("Success", "Login successful!", "success");
+            
+            // Update AppState
             AppState.user = result.user;
             
-            // Update sidebar
-            document.getElementById('sidebarUserName').textContent = result.user.name;
-            document.getElementById('sidebarUserPhone').textContent = result.user.phone;
+            // Update streak from result
+            if (result.streak) {
+                AppState.currentStreak = result.streak.currentStreak || 0;
+                AppState.highestStreak = result.streak.highestStreak || 0;
+                
+                // Update localStorage
+                localStorage.setItem('bfitCurrentStreak', AppState.currentStreak);
+                localStorage.setItem('bfitHighestStreak', AppState.highestStreak);
+                
+                // Update display
+                const currentStreakElement = document.getElementById('currentStreakCount');
+                if (currentStreakElement) {
+                    currentStreakElement.textContent = AppState.currentStreak;
+                }
+            }
             
-            // Navigate to loading then dashboard
-            navigateTo('loading');
+            // Navigate to dashboard
             setTimeout(() => {
-                navigateTo('dashboard');
-            }, 2000);
-            
-        } catch (apiError) {
-            console.log('API login failed, trying local storage');
-            
-            // Fallback to local storage login
-            if (loginUser(phone, password)) {
-                // Show loading and then go to dashboard
+                hideAlert();
                 navigateTo('loading');
                 setTimeout(() => {
                     navigateTo('dashboard');
-                }, 2000);
-            } else {
-                showAlert("Login Failed", "Invalid phone number or password", "error");
-            }
+                }, 1500);
+            }, 1500);
+            
+        } catch (error) {
+            console.error('Login error:', error);
+            hideAlert();
+            showAlert("Login Failed", "Invalid phone number or password", "error");
         }
     });
     
@@ -1507,10 +1706,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Dashboard
     document.getElementById('startWorkoutBtn').addEventListener('click', function() {
-        // Reset selected day to current day
         AppState.selectedDayForWorkout = null;
         
-        if (AppState.currentWorkoutDay === 0) { // Rest day
+        if (AppState.currentWorkoutDay === 0) {
             showAlert("Rest Day", "Today is rest day! No workout scheduled. Take this day to recover and rejuvenate.", "info");
             return;
         }
@@ -1554,7 +1752,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Completion Page
     document.getElementById('goToDashboardFromCompletionBtn').addEventListener('click', function() {
-        // Reset selected day
         AppState.selectedDayForWorkout = null;
         navigateTo('dashboard');
     });
@@ -1587,19 +1784,15 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('sidebarLogoutBtn').addEventListener('click', function() {
         showAlert("Confirm Logout", "Are you sure you want to logout?", "warning");
         
-        // Change alert button to confirm logout
         const alertButton = document.getElementById('alertButton');
         alertButton.textContent = "LOGOUT";
         alertButton.onclick = function() {
-            // Clear API token
+            // Clear tokens
             ApiService.clearToken();
-            
-            // Clear local storage
-            localStorage.removeItem('bfitCurrentUser');
-            localStorage.removeItem('bfitToken');
             
             // Reset AppState
             AppState.user = null;
+            AppState.currentPage = 'hero';
             
             // Navigate to hero page
             navigateTo('hero');
@@ -1611,4 +1804,38 @@ document.addEventListener('DOMContentLoaded', function() {
             alertButton.onclick = hideAlert;
         };
     });
+    
+    // Check if user is already logged in
+    setTimeout(() => {
+        const currentUser = localStorage.getItem('bfitCurrentUser');
+        const token = ApiService.getToken();
+        
+        if (currentUser && token) {
+            console.log('User already logged in, redirecting to dashboard...');
+            navigateTo('dashboard');
+        }
+    }, 1000);
+});
+
+// ✅ Add: Test Backend Connection on Load
+window.addEventListener('load', function() {
+    console.log('Testing backend connection...');
+    
+    // Test if backend is reachable
+    fetch('https://b-fit-backend-jy2e.onrender.com/api/health')
+        .then(response => {
+            if (response.ok) {
+                console.log('✅ Backend is reachable');
+                return response.json();
+            } else {
+                throw new Error('Backend not responding');
+            }
+        })
+        .then(data => {
+            console.log('Backend status:', data);
+        })
+        .catch(error => {
+            console.log('❌ Backend is offline:', error.message);
+            console.log('Using offline/local storage mode');
+        });
 });
