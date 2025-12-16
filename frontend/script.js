@@ -427,7 +427,7 @@ const AppState = {
 };
 
 // API Configuration
-const API_BASE_URL = 'http://localhost:5000/api'; // Change in production
+const API_BASE_URL = 'https://b-fit-backend-jy2e.onrender.com/api'; // Change in production  
 
 // API Service Functions
 const ApiService = {
