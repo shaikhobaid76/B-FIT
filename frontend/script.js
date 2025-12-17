@@ -442,7 +442,7 @@ const AppState = {
 // ✅ API Configuration
 const API_BASE_URL = 'https://b-fit-backend-jy2e.onrender.com/api';
 
-// ✅ SIMPLE API Service Functions - ONLY Login, Register, Streak MongoDB में
+// ✅ FIXED API Service Functions
 const ApiService = {
     // Set token with auto-logout timer
     setToken(token) {
@@ -530,9 +530,11 @@ const ApiService = {
         return false;
     },
     
-    // ✅ SIMPLE: Make API request
+    // ✅ FIXED: Make API request - with proper error handling
     async request(endpoint, method = 'GET', data = null) {
         const url = `${API_BASE_URL}${endpoint}`;
+        
+        console.log(`📡 API Request: ${method} ${url}`, data);
         
         const headers = {
             'Content-Type': 'application/json',
@@ -550,14 +552,28 @@ const ApiService = {
         try {
             const response = await fetch(url, config);
             
+            console.log(`📡 API Response Status: ${response.status}`);
+            
             if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`HTTP ${response.status}: ${errorText}`);
+                // Try to get error message
+                let errorText = `HTTP ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    errorText = `HTTP ${response.status}: ${JSON.stringify(errorData)}`;
+                } catch (e) {
+                    errorText = `HTTP ${response.status}: ${await response.text()}`;
+                }
+                
+                console.error(`❌ API Error at ${endpoint}:`, errorText);
+                throw new Error(errorText);
             }
             
-            return await response.json();
+            const result = await response.json();
+            console.log(`✅ API Success at ${endpoint}:`, result);
+            return result;
+            
         } catch (error) {
-            console.error(`API Error at ${endpoint}:`, error.message);
+            console.error(`❌ API Network Error at ${endpoint}:`, error.message);
             throw error;
         }
     },
@@ -565,10 +581,10 @@ const ApiService = {
     // ✅ Register - MongoDB में save
     async register(userData) {
         try {
-            console.log('Registering user:', { ...userData, password: '***' });
+            console.log('📝 Registering user:', { ...userData, password: '***' });
             const result = await this.request('/register', 'POST', userData);
             
-            if (result.userId) {
+            if (result.success && result.userId) {
                 // Create a simple token for local storage
                 const token = btoa(`${userData.phone}:${Date.now()}`);
                 this.setToken(token);
@@ -588,20 +604,29 @@ const ApiService = {
                 console.log('✅ Registration successful:', result);
                 return result;
             }
-            throw new Error('Registration failed - no userId received');
+            throw new Error(result.error || 'Registration failed');
         } catch (error) {
             console.error('❌ API register failed:', error.message);
             throw error;
         }
     },
     
-    // ✅ Login - MongoDB से verify
+    // ✅ FIXED: Login - MongoDB से verify
     async login(phone, password) {
         try {
-            console.log('Logging in user:', phone);
-            const result = await this.request('/login', 'POST', { phone, password });
+            console.log('🔐 Logging in user:', phone);
             
-            if (result.userId) {
+            // ✅ FIXED: Send data with correct field name "phone" (not "phoneNumber")
+            const requestData = {
+                phone: phone,  // ✅ CORRECT FIELD NAME
+                password: password
+            };
+            
+            console.log('📡 Sending login data:', requestData);
+            
+            const result = await this.request('/login', 'POST', requestData);
+            
+            if (result.success && result.userId) {
                 // Create a simple token for local storage
                 const token = btoa(`${phone}:${Date.now()}`);
                 this.setToken(token);
@@ -609,10 +634,10 @@ const ApiService = {
                 // ✅ Save user locally for quick access
                 const userData = {
                     _id: result.userId,
-                    name: result.user?.name || result.user?.name || 'User',
+                    name: result.user?.name || 'User',
                     phone: phone,
-                    gender: result.user?.gender || result.user?.gender || '',
-                    age: result.user?.age || result.user?.age || null
+                    gender: result.user?.gender || '',
+                    age: result.user?.age || null
                 };
                 
                 localStorage.setItem('bfitCurrentUser', JSON.stringify(userData));
@@ -629,7 +654,7 @@ const ApiService = {
                 console.log('✅ Login successful:', result);
                 return result;
             }
-            throw new Error('Login failed - no userId received');
+            throw new Error(result.error || 'Login failed');
         } catch (error) {
             console.error('❌ API login failed:', error.message);
             throw error;
@@ -639,7 +664,7 @@ const ApiService = {
     // ✅ Update Streak - MongoDB में save
     async updateStreak(userId, streakData) {
         try {
-            console.log('Updating streak in MongoDB:', { userId, ...streakData });
+            console.log('📈 Updating streak in MongoDB:', { userId, ...streakData });
             const result = await this.request('/streak/update', 'POST', {
                 userId,
                 ...streakData
@@ -656,7 +681,7 @@ const ApiService = {
     // ✅ Get Streak - MongoDB से लोड
     async getStreak(userId) {
         try {
-            console.log('Getting streak from MongoDB for user:', userId);
+            console.log('🔍 Getting streak from MongoDB for user:', userId);
             const result = await this.request(`/streak/${userId}`, 'GET');
             
             console.log('✅ Streak loaded from MongoDB:', result);
@@ -1421,7 +1446,7 @@ function initializePasswordToggles() {
     }
 }
 
-// ✅ FIXED: Event Listeners with page persistence
+// ✅ FIXED: Event Listeners
 document.addEventListener('DOMContentLoaded', function() {
     console.log('B-FIT App Initializing...');
     
@@ -1461,7 +1486,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // ✅ IMPROVED: Hero Page - Check login status and navigate to saved page
+    // ✅ FIXED: Hero Page - Check login status and navigate to saved page
     document.getElementById('getStartedBtn').addEventListener('click', function() {
         const currentUser = localStorage.getItem('bfitCurrentUser');
         if (currentUser) {
@@ -1508,7 +1533,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }, 1000);
     
-    // Register Form
+    // ✅ FIXED: Register Form
     document.getElementById('registerForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
@@ -1525,7 +1550,10 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        if (!/^\d{10}$/.test(phone)) {
+        // Clean phone number (remove all non-digits)
+        const cleanedPhone = phone.replace(/\D/g, '');
+        
+        if (cleanedPhone.length < 10) {
             showAlert("Validation Error", "Please enter a valid 10-digit phone number", "warning");
             return;
         }
@@ -1551,7 +1579,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const userData = { 
                 name, 
-                phone, 
+                phone: cleanedPhone,  // ✅ Send cleaned phone number
                 password, 
                 gender, 
                 age: age || null 
@@ -1582,15 +1610,30 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Login Form
+    // ✅ FIXED: Login Form
     document.getElementById('loginForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
-        const phone = document.getElementById('loginPhone').value.trim();
+        // Get and clean phone number
+        let phone = document.getElementById('loginPhone').value.trim();
+        
+        // Remove all non-digits (spaces, dashes, plus signs)
+        phone = phone.replace(/\D/g, '');
+        
         const password = document.getElementById('loginPassword').value;
         
-        if (!phone || !password) {
-            showAlert("Validation Error", "Please enter phone and password", "warning");
+        console.log('🔐 Login attempt with:', {
+            phone: phone,
+            passwordLength: password.length
+        });
+        
+        if (phone.length < 10) {
+            showAlert("Validation Error", "Please enter a valid 10-digit phone number", "warning");
+            return;
+        }
+        
+        if (!password || password.length < 6) {
+            showAlert("Validation Error", "Please enter your password (min 6 characters)", "warning");
             return;
         }
         
@@ -1598,7 +1641,7 @@ document.addEventListener('DOMContentLoaded', function() {
         showAlert("Logging In", "Please wait...", "info");
         
         try {
-            // ✅ Login from MongoDB
+            // ✅ FIXED: Login from MongoDB
             const result = await ApiService.login(phone, password);
             
             hideAlert();
@@ -1620,9 +1663,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 1500);
             
         } catch (error) {
-            console.error('Login error:', error);
+            console.error('❌ Login error:', error);
             hideAlert();
-            showAlert("Login Failed", error.message || "Invalid phone number or password", "error");
+            showAlert("Login Failed", "Invalid phone number or password. Please check your credentials.", "error");
         }
     });
     
