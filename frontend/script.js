@@ -1,3 +1,7 @@
+// ==============================================
+// 🏋️‍♂️ B-FIT GYM APP - FRONTEND SCRIPT
+// ==============================================
+
 // App State Management
 const AppState = {
     currentPage: 'hero',
@@ -480,7 +484,7 @@ const ApiService = {
         
         AppState.logoutTimer = setTimeout(() => {
             this.autoLogout();
-        }, 5 * 60 * 60 * 1000);
+        }, 5 * 60 * 60 * 1000); // 5 hours
     },
     
     // ✅ Stop auto-logout timer
@@ -534,7 +538,7 @@ const ApiService = {
     async request(endpoint, method = 'GET', data = null) {
         const url = `${API_BASE_URL}${endpoint}`;
         
-        console.log(`📡 API Request: ${method} ${url}`, data);
+        console.log(`📡 API Request: ${method} ${url}`, data ? { ...data, password: data.password ? '***' : undefined } : 'No data');
         
         const headers = {
             'Content-Type': 'application/json',
@@ -543,6 +547,8 @@ const ApiService = {
         const config = {
             method,
             headers,
+            mode: 'cors',
+            credentials: 'omit'
         };
         
         if (data && method !== 'GET') {
@@ -555,13 +561,12 @@ const ApiService = {
             console.log(`📡 API Response Status: ${response.status}`);
             
             if (!response.ok) {
-                // Try to get error message
                 let errorText = `HTTP ${response.status}`;
                 try {
                     const errorData = await response.json();
                     errorText = `HTTP ${response.status}: ${JSON.stringify(errorData)}`;
                 } catch (e) {
-                    errorText = `HTTP ${response.status}: ${await response.text()}`;
+                    errorText = `HTTP ${response.status}: ${response.statusText}`;
                 }
                 
                 console.error(`❌ API Error at ${endpoint}:`, errorText);
@@ -578,10 +583,14 @@ const ApiService = {
         }
     },
     
-    // ✅ Register - MongoDB में save
+    // ✅ Register - Save to MongoDB
     async register(userData) {
         try {
-            console.log('📝 Registering user:', { ...userData, password: '***' });
+            console.log('📝 Registering user:', { 
+                ...userData, 
+                password: '***' 
+            });
+            
             const result = await this.request('/register', 'POST', userData);
             
             if (result.success && result.userId) {
@@ -611,31 +620,33 @@ const ApiService = {
         }
     },
     
-    // ✅ FIXED: Login - MongoDB से verify
+    // ✅ FIXED: Login - Verify from MongoDB
     async login(phone, password) {
         try {
             console.log('🔐 Logging in user:', phone);
             
-            // ✅ FIXED: Send data with correct field name "phone" (not "phoneNumber")
+            // ✅ FIXED: Clean phone number
+            const cleanedPhone = phone.replace(/\D/g, '');
+            
             const requestData = {
-                phone: phone,  // ✅ CORRECT FIELD NAME
+                phone: cleanedPhone,
                 password: password
             };
             
-            console.log('📡 Sending login data:', requestData);
+            console.log('📡 Sending login data:', { ...requestData, password: '***' });
             
             const result = await this.request('/login', 'POST', requestData);
             
             if (result.success && result.userId) {
                 // Create a simple token for local storage
-                const token = btoa(`${phone}:${Date.now()}`);
+                const token = btoa(`${cleanedPhone}:${Date.now()}`);
                 this.setToken(token);
                 
                 // ✅ Save user locally for quick access
                 const userData = {
                     _id: result.userId,
                     name: result.user?.name || 'User',
-                    phone: phone,
+                    phone: cleanedPhone,
                     gender: result.user?.gender || '',
                     age: result.user?.age || null
                 };
@@ -661,13 +672,13 @@ const ApiService = {
         }
     },
     
-    // ✅ Update Streak - MongoDB में save
-    async updateStreak(userId, streakData) {
+    // ✅ Update Streak - Save to MongoDB
+    async updateStreak(userId) {
         try {
-            console.log('📈 Updating streak in MongoDB:', { userId, ...streakData });
+            console.log('📈 Updating streak in MongoDB for userId:', userId);
+            
             const result = await this.request('/streak/update', 'POST', {
-                userId,
-                ...streakData
+                userId: userId
             });
             
             console.log('✅ Streak updated in MongoDB:', result);
@@ -678,7 +689,7 @@ const ApiService = {
         }
     },
     
-    // ✅ Get Streak - MongoDB से लोड
+    // ✅ Get Streak - Load from MongoDB
     async getStreak(userId) {
         try {
             console.log('🔍 Getting streak from MongoDB for user:', userId);
@@ -688,6 +699,71 @@ const ApiService = {
             return result;
         } catch (error) {
             console.error('❌ Get streak failed:', error.message);
+            throw error;
+        }
+    },
+    
+    // ✅ Get User by ID
+    async getUserById(userId) {
+        try {
+            console.log('👤 Getting user by ID:', userId);
+            const result = await this.request(`/user/${userId}`, 'GET');
+            
+            return result;
+        } catch (error) {
+            console.error('❌ Get user failed:', error.message);
+            throw error;
+        }
+    },
+    
+    // ✅ Reset Password
+    async resetPassword(phone, newPassword) {
+        try {
+            console.log('🔑 Resetting password for phone:', phone);
+            
+            const result = await this.request('/reset-password', 'POST', {
+                phone: phone.replace(/\D/g, ''),
+                newPassword: newPassword
+            });
+            
+            return result;
+        } catch (error) {
+            console.error('❌ Reset password failed:', error.message);
+            throw error;
+        }
+    },
+    
+    // ✅ Check Backend Connection
+    async checkBackendConnection() {
+        try {
+            console.log('🔗 Testing backend connection...');
+            const response = await fetch(`${API_BASE_URL}/health`);
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log('✅ Backend is reachable');
+                console.log('Backend status:', data);
+                return { connected: true, data: data };
+            } else {
+                console.log('❌ Backend not responding properly');
+                return { connected: false, error: 'Backend not responding' };
+            }
+        } catch (error) {
+            console.log('❌ Backend is offline:', error.message);
+            return { connected: false, error: error.message };
+        }
+    },
+    
+    // ✅ Debug: Get all users
+    async debugGetAllUsers() {
+        try {
+            console.log('🐛 Debug: Getting all users from backend');
+            const result = await this.request('/all-data', 'GET');
+            
+            console.log('🐛 Debug Users:', result);
+            return result;
+        } catch (error) {
+            console.error('🐛 Debug get users failed:', error.message);
             throw error;
         }
     }
@@ -729,29 +805,46 @@ function initializeCountdownTimer() {
 
 // Alert Modal Functions
 function showAlert(title, message, icon = "info") {
-    document.getElementById('alertTitle').textContent = title;
-    document.getElementById('alertMessage').textContent = message;
+    const alertModal = document.getElementById('alertModal');
+    const alertTitle = document.getElementById('alertTitle');
+    const alertMessage = document.getElementById('alertMessage');
+    const alertIcon = document.getElementById('alertIcon');
     
-    const iconElement = document.getElementById('alertIcon');
-    switch(icon) {
-        case "success":
-            iconElement.innerHTML = '<i class="fas fa-check-circle"></i>';
-            break;
-        case "error":
-            iconElement.innerHTML = '<i class="fas fa-exclamation-circle"></i>';
-            break;
-        case "warning":
-            iconElement.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
-            break;
-        default:
-            iconElement.innerHTML = '<i class="fas fa-info-circle"></i>';
+    if (!alertModal || !alertTitle || !alertMessage || !alertIcon) {
+        console.error('Alert modal elements not found');
+        alert(title + ': ' + message);
+        return;
     }
     
-    document.getElementById('alertModal').classList.add('active');
+    alertTitle.textContent = title;
+    alertMessage.textContent = message;
+    
+    switch(icon) {
+        case "success":
+            alertIcon.innerHTML = '<i class="fas fa-check-circle"></i>';
+            alertIcon.style.color = '#4CAF50';
+            break;
+        case "error":
+            alertIcon.innerHTML = '<i class="fas fa-exclamation-circle"></i>';
+            alertIcon.style.color = '#f44336';
+            break;
+        case "warning":
+            alertIcon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+            alertIcon.style.color = '#FF9800';
+            break;
+        default:
+            alertIcon.innerHTML = '<i class="fas fa-info-circle"></i>';
+            alertIcon.style.color = '#2196F3';
+    }
+    
+    alertModal.classList.add('active');
 }
 
 function hideAlert() {
-    document.getElementById('alertModal').classList.remove('active');
+    const alertModal = document.getElementById('alertModal');
+    if (alertModal) {
+        alertModal.classList.remove('active');
+    }
 }
 
 // ✅ IMPROVED: Navigation Functions with page persistence
@@ -765,6 +858,7 @@ function navigateTo(pageName) {
     
     if (!nextPage) {
         console.error('Page not found:', pageName);
+        showAlert("Navigation Error", `Page "${pageName}" not found`, "error");
         return;
     }
     
@@ -797,6 +891,8 @@ function navigateTo(pageName) {
 
 function updateHamburgerVisibility() {
     const hamburgerBtn = document.getElementById('hamburgerBtn');
+    if (!hamburgerBtn) return;
+    
     if (AppState.currentPage === 'dashboard' || AppState.currentPage === 'profile' || 
         AppState.currentPage === 'warmup' || AppState.currentPage === 'workoutSets' || 
         AppState.currentPage === 'workout' || AppState.currentPage === 'completion') {
@@ -810,6 +906,8 @@ function updateHamburgerVisibility() {
 function updateBackButtonVisibility() {
     const backButtons = document.querySelectorAll('.back-button');
     backButtons.forEach(btn => {
+        if (!btn) return;
+        
         if (AppState.currentPage === 'warmup' || AppState.currentPage === 'workoutSets' || 
             AppState.currentPage === 'workout' || AppState.currentPage === 'profile') {
             btn.style.visibility = 'visible';
@@ -820,6 +918,8 @@ function updateBackButtonVisibility() {
 }
 
 function initializePage(pageName) {
+    console.log(`Initializing page: ${pageName}`);
+    
     switch(pageName) {
         case 'dashboard':
             updateDashboard();
@@ -838,6 +938,16 @@ function initializePage(pageName) {
             break;
         case 'profile':
             loadProfilePage();
+            break;
+        case 'login':
+            // Clear login form
+            const loginForm = document.getElementById('loginForm');
+            if (loginForm) loginForm.reset();
+            break;
+        case 'register':
+            // Clear register form
+            const registerForm = document.getElementById('registerForm');
+            if (registerForm) registerForm.reset();
             break;
     }
 }
@@ -882,6 +992,9 @@ async function updateDashboard() {
         // Update workout image
         updateWorkoutImage();
         
+        // Update welcome message
+        updateWelcomeMessage();
+        
     } catch (error) {
         console.error('Dashboard update error:', error);
         // Fallback
@@ -889,6 +1002,7 @@ async function updateDashboard() {
         updateTodaysWorkout();
         updateDateTime();
         updateWorkoutImage();
+        updateWelcomeMessage();
     }
 }
 
@@ -931,13 +1045,27 @@ function loadFromLocalStorage() {
     }
 }
 
+function updateWelcomeMessage() {
+    const welcomeElement = document.getElementById('welcomeUser');
+    if (welcomeElement && AppState.user && AppState.user.name) {
+        welcomeElement.textContent = `Welcome, ${AppState.user.name}!`;
+    } else if (welcomeElement) {
+        welcomeElement.textContent = 'Welcome!';
+    }
+}
+
 // ✅ Get streak from MongoDB
 async function updateStreakFromMongoDB() {
     try {
         const userId = localStorage.getItem('bfitUserId');
-        if (!userId) return;
+        if (!userId) {
+            console.log('No userId found in localStorage');
+            return;
+        }
         
+        console.log('🔍 Getting streak from MongoDB for userId:', userId);
         const result = await ApiService.getStreak(userId);
+        
         if (result && result.streak) {
             AppState.currentStreak = result.streak.currentStreak || 0;
             AppState.highestStreak = result.streak.highestStreak || 0;
@@ -953,6 +1081,8 @@ async function updateStreakFromMongoDB() {
             localStorage.setItem('bfitHighestStreak', AppState.highestStreak);
             
             console.log('✅ Streak loaded from MongoDB:', result.streak);
+        } else {
+            console.log('No streak data returned from MongoDB');
         }
     } catch (error) {
         console.log('Could not load streak from MongoDB:', error.message);
@@ -963,18 +1093,23 @@ function updateTodaysWorkout() {
     const workoutTitle = document.getElementById('todayWorkout');
     const todayWorkout = AppState.weeklyWorkouts[AppState.currentDay];
     
-    if (todayWorkout && todayWorkout.title) {
-        workoutTitle.textContent = todayWorkout.title;
-        AppState.currentWorkoutDay = AppState.currentDay;
-    } else {
-        workoutTitle.textContent = "REST DAY";
-        AppState.currentWorkoutDay = 0;
+    if (workoutTitle) {
+        if (todayWorkout && todayWorkout.title) {
+            workoutTitle.textContent = todayWorkout.title;
+            AppState.currentWorkoutDay = AppState.currentDay;
+        } else {
+            workoutTitle.textContent = "REST DAY";
+            AppState.currentWorkoutDay = 0;
+        }
     }
 }
 
 function updateWorkoutImage() {
     const imageContainer = document.getElementById('workoutImageContainer');
     const imageText = document.getElementById('workoutImageText');
+    
+    if (!imageContainer || !imageText) return;
+    
     const workout = AppState.weeklyWorkouts[AppState.currentWorkoutDay];
     
     if (workout && workout.title) {
@@ -1079,10 +1214,15 @@ function loadWorkoutSetsPage() {
         return;
     }
     
-    document.getElementById('workoutSetsTitle').textContent = workout.day.toUpperCase();
-    document.getElementById('workoutDayTitle').textContent = workout.title;
+    const workoutSetsTitle = document.getElementById('workoutSetsTitle');
+    const workoutDayTitle = document.getElementById('workoutDayTitle');
+    
+    if (workoutSetsTitle) workoutSetsTitle.textContent = workout.day.toUpperCase();
+    if (workoutDayTitle) workoutDayTitle.textContent = workout.title;
     
     const setsGrid = document.getElementById('workoutSetsGrid');
+    if (!setsGrid) return;
+    
     setsGrid.innerHTML = '';
     
     sets.forEach((set, index) => {
@@ -1123,45 +1263,103 @@ function loadWorkoutExercise() {
     
     const exercise = workout.exercises[AppState.currentExerciseIndex];
     
-    document.getElementById('currentExerciseName').textContent = exercise.name.toUpperCase();
-    document.getElementById('currentExerciseDetails').textContent = `${exercise.sets} × ${exercise.reps}`;
-    document.getElementById('currentExerciseIndex').textContent = AppState.currentExerciseIndex + 1;
-    document.getElementById('totalExercises').textContent = workout.exercises.length;
-    document.getElementById('workoutPageTitle').textContent = workout.day.toUpperCase();
+    // Update exercise details
+    const currentExerciseName = document.getElementById('currentExerciseName');
+    const currentExerciseDetails = document.getElementById('currentExerciseDetails');
+    const currentExerciseIndex = document.getElementById('currentExerciseIndex');
+    const totalExercises = document.getElementById('totalExercises');
+    const workoutPageTitle = document.getElementById('workoutPageTitle');
+    
+    if (currentExerciseName) currentExerciseName.textContent = exercise.name.toUpperCase();
+    if (currentExerciseDetails) currentExerciseDetails.textContent = `${exercise.sets} × ${exercise.reps}`;
+    if (currentExerciseIndex) currentExerciseIndex.textContent = AppState.currentExerciseIndex + 1;
+    if (totalExercises) totalExercises.textContent = workout.exercises.length;
+    if (workoutPageTitle) workoutPageTitle.textContent = workout.day.toUpperCase();
     
     AppState.currentYoutubeLink = exercise.youtubeLink;
     AppState.currentVideoLink = exercise.video || AppState.workoutVideos[exercise.name];
     
     const videoContainer = document.getElementById('exerciseVideoContainer');
-    const video = document.getElementById('exerciseVideo');
-    const videoSource = document.getElementById('videoSource');
+    if (!videoContainer) return;
+    
+    // Clear video container
+    videoContainer.innerHTML = '';
     
     if (AppState.currentVideoLink) {
-        videoSource.src = AppState.currentVideoLink;
+        const video = document.createElement('video');
+        video.id = 'exerciseVideo';
+        video.controls = true;
+        video.preload = 'metadata';
+        video.style.width = '100%';
+        video.style.borderRadius = '10px';
+        
+        const source = document.createElement('source');
+        source.src = AppState.currentVideoLink;
+        source.type = 'video/mp4';
+        
+        video.appendChild(source);
+        videoContainer.appendChild(video);
+        
+        // Add fallback for unsupported videos
+        const fallbackText = document.createElement('p');
+        fallbackText.textContent = 'Your browser does not support the video tag.';
+        fallbackText.style.color = '#fff';
+        fallbackText.style.textAlign = 'center';
+        fallbackText.style.padding = '20px';
+        video.appendChild(fallbackText);
+        
+        // Try to play video
         video.load();
         video.play().catch(e => {
             console.log("Video autoplay prevented:", e);
+            
+            // Create play button overlay
             videoContainer.innerHTML = `
-                <div class="video-placeholder" id="videoPlaceholder">
-                    <i class="fas fa-play-circle"></i>
-                    <p>Click to play exercise video</p>
+                <div class="video-placeholder" id="videoPlaceholder" style="
+                    width: 100%;
+                    height: 300px;
+                    background: rgba(0,0,0,0.7);
+                    border-radius: 10px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    position: relative;
+                ">
+                    <i class="fas fa-play-circle" style="font-size: 80px; color: #FFD700; margin-bottom: 20px;"></i>
+                    <p style="color: white; font-size: 18px;">Click to play exercise video</p>
+                    <p style="color: #ccc; font-size: 14px; margin-top: 10px;">${exercise.name}</p>
                 </div>
-                <video id="exerciseVideo" style="display: none;">
-                    <source id="videoSource" src="${AppState.currentVideoLink}" type="video/mp4">
+                <video id="exerciseVideo" style="display: none; width: 100%; border-radius: 10px;">
+                    <source src="${AppState.currentVideoLink}" type="video/mp4">
                 </video>
             `;
             
             document.getElementById('videoPlaceholder').addEventListener('click', function() {
                 this.style.display = 'none';
-                video.style.display = 'block';
-                video.play();
+                const hiddenVideo = document.getElementById('exerciseVideo');
+                if (hiddenVideo) {
+                    hiddenVideo.style.display = 'block';
+                    hiddenVideo.play();
+                }
             });
         });
     } else {
         videoContainer.innerHTML = `
-            <div class="video-placeholder">
-                <i class="fas fa-play-circle"></i>
-                <p>Video not available for this exercise</p>
+            <div class="video-placeholder" style="
+                width: 100%;
+                height: 300px;
+                background: rgba(0,0,0,0.7);
+                border-radius: 10px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+            ">
+                <i class="fas fa-play-circle" style="font-size: 80px; color: #666; margin-bottom: 20px;"></i>
+                <p style="color: white; font-size: 18px;">Video not available for this exercise</p>
+                <p style="color: #ccc; font-size: 14px; margin-top: 10px;">${exercise.name}</p>
             </div>
         `;
     }
@@ -1171,12 +1369,15 @@ function startCountdown() {
     const countdownContainer = document.getElementById('countdownTimerContainer');
     const countdownDisplay = document.getElementById('countdownTimerDisplay');
     
+    if (!countdownContainer || !countdownDisplay) return;
+    
     countdownContainer.style.display = 'flex';
     countdownContainer.classList.add('active');
     
     let timeLeft = 60;
     countdownDisplay.textContent = timeLeft;
     
+    // Clear any existing interval
     if (AppState.countdownInterval) {
         clearInterval(AppState.countdownInterval);
     }
@@ -1187,6 +1388,7 @@ function startCountdown() {
         
         if (timeLeft <= 0) {
             clearInterval(AppState.countdownInterval);
+            AppState.countdownInterval = null;
             countdownContainer.classList.remove('active');
             countdownContainer.style.display = 'none';
             
@@ -1216,7 +1418,7 @@ function hasWorkedOutToday() {
     return today === lastDate;
 }
 
-// ✅ FIXED: Update Streak Function - MongoDB में save
+// ✅ FIXED: Update Streak Function - Save to MongoDB
 async function updateStreak() {
     try {
         const now = new Date();
@@ -1289,11 +1491,7 @@ async function updateStreak() {
         
         if (userId) {
             try {
-                await ApiService.updateStreak(userId, {
-                    currentStreak: currentStreak,
-                    highestStreak: highestStreak,
-                    lastWorkoutDate: today
-                });
+                await ApiService.updateStreak(userId);
                 
                 console.log('✅ Streak saved to MongoDB');
                 showAlert("Great Job!", `Your streak is now ${currentStreak} days! (Saved to Database)`, "success");
@@ -1326,10 +1524,13 @@ async function updateStreak() {
 }
 
 function updateCompletionPage() {
-    document.getElementById('updatedStreak').textContent = AppState.currentStreak;
+    const updatedStreakElement = document.getElementById('updatedStreak');
+    if (updatedStreakElement) {
+        updatedStreakElement.textContent = AppState.currentStreak;
+    }
 }
 
-// ✅ Profile Functions - localStorage में save
+// ✅ Profile Functions - Save to localStorage
 async function loadProfilePage() {
     try {
         // Load from local storage
@@ -1338,30 +1539,49 @@ async function loadProfilePage() {
         if (savedUser) {
             AppState.user = JSON.parse(savedUser);
             
-            document.getElementById('profileUserName').textContent = AppState.user.name || 'User';
-            document.getElementById('profileUserPhone').textContent = AppState.user.phone || 'N/A';
-            document.getElementById('profileName').value = AppState.user.name || '';
-            document.getElementById('profilePhone').value = AppState.user.phone || '';
-            document.getElementById('profileAge').value = AppState.user.age || '';
-            document.getElementById('profileGender').value = AppState.user.gender || '';
+            const profileUserName = document.getElementById('profileUserName');
+            const profileUserPhone = document.getElementById('profileUserPhone');
+            const profileName = document.getElementById('profileName');
+            const profilePhone = document.getElementById('profilePhone');
+            const profileAge = document.getElementById('profileAge');
+            const profileGender = document.getElementById('profileGender');
+            
+            if (profileUserName) profileUserName.textContent = AppState.user.name || 'User';
+            if (profileUserPhone) profileUserPhone.textContent = AppState.user.phone || 'N/A';
+            if (profileName) profileName.value = AppState.user.name || '';
+            if (profilePhone) profilePhone.value = AppState.user.phone || '';
+            if (profileAge) profileAge.value = AppState.user.age || '';
+            if (profileGender) profileGender.value = AppState.user.gender || '';
         }
         
         // Update streak stats
-        document.getElementById('profileCurrentStreak').textContent = AppState.currentStreak;
-        document.getElementById('profileHighestStreak').textContent = AppState.highestStreak;
+        const profileCurrentStreak = document.getElementById('profileCurrentStreak');
+        const profileHighestStreak = document.getElementById('profileHighestStreak');
+        
+        if (profileCurrentStreak) profileCurrentStreak.textContent = AppState.currentStreak;
+        if (profileHighestStreak) profileHighestStreak.textContent = AppState.highestStreak;
         
     } catch (error) {
         console.error('Profile load error:', error);
     }
 }
 
-// ✅ Profile save - ONLY localStorage में
+// ✅ Profile save - Save to localStorage
 async function saveProfileData() {
     try {
+        const profileName = document.getElementById('profileName');
+        const profileAge = document.getElementById('profileAge');
+        const profileGender = document.getElementById('profileGender');
+        
+        if (!profileName || !profileAge || !profileGender) {
+            showAlert("Validation Error", "Profile form elements not found", "error");
+            return;
+        }
+        
         const profileData = {
-            name: document.getElementById('profileName').value.trim(),
-            age: document.getElementById('profileAge').value.trim(),
-            gender: document.getElementById('profileGender').value
+            name: profileName.value.trim(),
+            age: profileAge.value.trim(),
+            gender: profileGender.value
         };
         
         if (!profileData.name) {
@@ -1374,7 +1594,7 @@ async function saveProfileData() {
         const updatedUser = { 
             ...currentUser, 
             ...profileData,
-            phone: currentUser.phone || profileData.phone || ''
+            phone: currentUser.phone || ''
         };
         
         localStorage.setItem('bfitCurrentUser', JSON.stringify(updatedUser));
@@ -1398,13 +1618,19 @@ async function saveProfileData() {
 
 // Sidebar Functions
 function openSidebar() {
-    document.getElementById('sidebar').classList.add('sidebar-open');
-    document.getElementById('sidebarOverlay').style.display = 'block';
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    
+    if (sidebar) sidebar.classList.add('sidebar-open');
+    if (sidebarOverlay) sidebarOverlay.style.display = 'block';
 }
 
 function closeSidebar() {
-    document.getElementById('sidebar').classList.remove('sidebar-open');
-    document.getElementById('sidebarOverlay').style.display = 'none';
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    
+    if (sidebar) sidebar.classList.remove('sidebar-open');
+    if (sidebarOverlay) sidebarOverlay.style.display = 'none';
 }
 
 // Password Toggle Functionality
@@ -1446,7 +1672,21 @@ function initializePasswordToggles() {
     }
 }
 
-// ✅ FIXED: Event Listeners
+// ✅ Debug Function: Check Database Status
+async function debugDatabaseStatus() {
+    console.log('🐛 Debug: Checking database status...');
+    try {
+        const response = await fetch(`${API_BASE_URL}/debug/users`);
+        const data = await response.json();
+        console.log('🐛 Database Users:', data);
+        return data;
+    } catch (error) {
+        console.error('🐛 Debug error:', error);
+        return null;
+    }
+}
+
+// ✅ FIXED: Event Listeners - COMPLETE SETUP
 document.addEventListener('DOMContentLoaded', function() {
     console.log('B-FIT App Initializing...');
     
@@ -1476,30 +1716,44 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Initially hide hamburger button
-    document.getElementById('hamburgerBtn').style.display = 'none';
+    const hamburgerBtn = document.getElementById('hamburgerBtn');
+    if (hamburgerBtn) {
+        hamburgerBtn.style.display = 'none';
+    }
     
     // Alert Modal
-    document.getElementById('alertButton').addEventListener('click', hideAlert);
-    document.getElementById('alertModal').addEventListener('click', function(e) {
-        if (e.target === this) {
-            hideAlert();
-        }
-    });
+    const alertButton = document.getElementById('alertButton');
+    const alertModal = document.getElementById('alertModal');
+    
+    if (alertButton) {
+        alertButton.addEventListener('click', hideAlert);
+    }
+    
+    if (alertModal) {
+        alertModal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                hideAlert();
+            }
+        });
+    }
     
     // ✅ FIXED: Hero Page - Check login status and navigate to saved page
-    document.getElementById('getStartedBtn').addEventListener('click', function() {
-        const currentUser = localStorage.getItem('bfitCurrentUser');
-        if (currentUser) {
-            const savedPage = loadCurrentPage();
-            if (savedPage !== 'hero' && savedPage !== 'login' && savedPage !== 'register') {
-                navigateTo(savedPage);
+    const getStartedBtn = document.getElementById('getStartedBtn');
+    if (getStartedBtn) {
+        getStartedBtn.addEventListener('click', function() {
+            const currentUser = localStorage.getItem('bfitCurrentUser');
+            if (currentUser) {
+                const savedPage = loadCurrentPage();
+                if (savedPage !== 'hero' && savedPage !== 'login' && savedPage !== 'register') {
+                    navigateTo(savedPage);
+                } else {
+                    navigateTo('dashboard');
+                }
             } else {
-                navigateTo('dashboard');
+                navigateTo('login');
             }
-        } else {
-            navigateTo('login');
-        }
-    });
+        });
+    }
     
     // ✅ Auto-navigate to saved page on load
     setTimeout(() => {
@@ -1531,279 +1785,381 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         }
-    }, 1000);
+    }, 1500);
     
     // ✅ FIXED: Register Form
-    document.getElementById('registerForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const name = document.getElementById('registerName').value.trim();
-        const phone = document.getElementById('registerPhone').value.trim();
-        const gender = document.getElementById('registerGender').value;
-        const age = document.getElementById('registerAge').value.trim();
-        const password = document.getElementById('registerPassword').value;
-        const confirmPassword = document.getElementById('registerConfirmPassword').value;
-        
-        // Validation
-        if (name.length < 2) {
-            showAlert("Validation Error", "Name must be at least 2 characters long", "warning");
-            return;
-        }
-        
-        // Clean phone number (remove all non-digits)
-        const cleanedPhone = phone.replace(/\D/g, '');
-        
-        if (cleanedPhone.length < 10) {
-            showAlert("Validation Error", "Please enter a valid 10-digit phone number", "warning");
-            return;
-        }
-        
-        if (!gender) {
-            showAlert("Validation Error", "Please select your gender", "warning");
-            return;
-        }
-        
-        if (password.length < 6) {
-            showAlert("Validation Error", "Password must be at least 6 characters long", "warning");
-            return;
-        }
-        
-        if (password !== confirmPassword) {
-            showAlert("Validation Error", "Passwords do not match", "warning");
-            return;
-        }
-        
-        // Show loading
-        showAlert("Registering", "Creating your account...", "info");
-        
-        try {
-            const userData = { 
-                name, 
-                phone: cleanedPhone,  // ✅ Send cleaned phone number
-                password, 
-                gender, 
-                age: age || null 
-            };
+    const registerForm = document.getElementById('registerForm');
+    if (registerForm) {
+        registerForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
             
-            // ✅ Register in MongoDB
-            const result = await ApiService.register(userData);
+            const registerName = document.getElementById('registerName');
+            const registerPhone = document.getElementById('registerPhone');
+            const registerGender = document.getElementById('registerGender');
+            const registerAge = document.getElementById('registerAge');
+            const registerPassword = document.getElementById('registerPassword');
+            const registerConfirmPassword = document.getElementById('registerConfirmPassword');
             
-            hideAlert();
-            showAlert("Success", "Account created successfully!", "success");
+            if (!registerName || !registerPhone || !registerGender || !registerPassword || !registerConfirmPassword) {
+                showAlert("Form Error", "Registration form elements not found", "error");
+                return;
+            }
             
-            // Update AppState
-            AppState.user = result.user;
+            const name = registerName.value.trim();
+            let phone = registerPhone.value.trim();
+            const gender = registerGender.value;
+            const age = registerAge.value.trim();
+            const password = registerPassword.value;
+            const confirmPassword = registerConfirmPassword.value;
             
-            // Navigate to dashboard
-            setTimeout(() => {
+            // Validation
+            if (name.length < 2) {
+                showAlert("Validation Error", "Name must be at least 2 characters long", "warning");
+                return;
+            }
+            
+            // Clean phone number (remove all non-digits)
+            const cleanedPhone = phone.replace(/\D/g, '');
+            
+            if (cleanedPhone.length !== 10) {
+                showAlert("Validation Error", "Please enter a valid 10-digit phone number", "warning");
+                return;
+            }
+            
+            if (!gender) {
+                showAlert("Validation Error", "Please select your gender", "warning");
+                return;
+            }
+            
+            if (password.length < 6) {
+                showAlert("Validation Error", "Password must be at least 6 characters long", "warning");
+                return;
+            }
+            
+            if (password !== confirmPassword) {
+                showAlert("Validation Error", "Passwords do not match", "warning");
+                return;
+            }
+            
+            // Show loading
+            showAlert("Registering", "Creating your account...", "info");
+            
+            try {
+                const userData = { 
+                    name, 
+                    phone: cleanedPhone,
+                    password, 
+                    gender, 
+                    age: age || null 
+                };
+                
+                // ✅ Register in MongoDB
+                const result = await ApiService.register(userData);
+                
                 hideAlert();
-                navigateTo('loading');
+                showAlert("Success", "Account created successfully!", "success");
+                
+                // Update AppState
+                AppState.user = result.user;
+                
+                // Navigate to dashboard
                 setTimeout(() => {
-                    navigateTo('dashboard');
+                    hideAlert();
+                    navigateTo('loading');
+                    setTimeout(() => {
+                        navigateTo('dashboard');
+                    }, 1500);
                 }, 1500);
-            }, 1500);
-            
-        } catch (error) {
-            console.error('Registration error:', error);
-            hideAlert();
-            showAlert("Registration Failed", error.message || "Could not create account. Please try again.", "error");
-        }
-    });
+                
+            } catch (error) {
+                console.error('Registration error:', error);
+                hideAlert();
+                showAlert("Registration Failed", error.message || "Could not create account. Please try again.", "error");
+            }
+        });
+    }
     
     // ✅ FIXED: Login Form
-    document.getElementById('loginForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        // Get and clean phone number
-        let phone = document.getElementById('loginPhone').value.trim();
-        
-        // Remove all non-digits (spaces, dashes, plus signs)
-        phone = phone.replace(/\D/g, '');
-        
-        const password = document.getElementById('loginPassword').value;
-        
-        console.log('🔐 Login attempt with:', {
-            phone: phone,
-            passwordLength: password.length
-        });
-        
-        if (phone.length < 10) {
-            showAlert("Validation Error", "Please enter a valid 10-digit phone number", "warning");
-            return;
-        }
-        
-        if (!password || password.length < 6) {
-            showAlert("Validation Error", "Please enter your password (min 6 characters)", "warning");
-            return;
-        }
-        
-        // Show loading
-        showAlert("Logging In", "Please wait...", "info");
-        
-        try {
-            // ✅ FIXED: Login from MongoDB
-            const result = await ApiService.login(phone, password);
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
             
-            hideAlert();
-            showAlert("Success", "Login successful!", "success");
+            const loginPhone = document.getElementById('loginPhone');
+            const loginPassword = document.getElementById('loginPassword');
             
-            // Update AppState
-            AppState.user = result.user;
+            if (!loginPhone || !loginPassword) {
+                showAlert("Form Error", "Login form elements not found", "error");
+                return;
+            }
             
-            // Load streak from MongoDB
-            await updateStreakFromMongoDB();
+            // Get and clean phone number
+            let phone = loginPhone.value.trim();
             
-            // Navigate to dashboard
-            setTimeout(() => {
+            // Remove all non-digits (spaces, dashes, plus signs)
+            phone = phone.replace(/\D/g, '');
+            
+            const password = loginPassword.value;
+            
+            console.log('🔐 Login attempt with:', {
+                phone: phone,
+                passwordLength: password.length
+            });
+            
+            if (phone.length !== 10) {
+                showAlert("Validation Error", "Please enter a valid 10-digit phone number", "warning");
+                return;
+            }
+            
+            if (!password || password.length < 6) {
+                showAlert("Validation Error", "Please enter your password (min 6 characters)", "warning");
+                return;
+            }
+            
+            // Show loading
+            showAlert("Logging In", "Please wait...", "info");
+            
+            try {
+                // ✅ FIXED: Login from MongoDB
+                const result = await ApiService.login(phone, password);
+                
                 hideAlert();
-                navigateTo('loading');
+                showAlert("Success", "Login successful!", "success");
+                
+                // Update AppState
+                AppState.user = result.user;
+                
+                // Load streak from MongoDB
+                await updateStreakFromMongoDB();
+                
+                // Navigate to dashboard
                 setTimeout(() => {
-                    navigateTo('dashboard');
+                    hideAlert();
+                    navigateTo('loading');
+                    setTimeout(() => {
+                        navigateTo('dashboard');
+                    }, 1500);
                 }, 1500);
-            }, 1500);
-            
-        } catch (error) {
-            console.error('❌ Login error:', error);
-            hideAlert();
-            showAlert("Login Failed", "Invalid phone number or password. Please check your credentials.", "error");
-        }
-    });
+                
+            } catch (error) {
+                console.error('❌ Login error:', error);
+                hideAlert();
+                
+                // Show detailed error message
+                let errorMessage = "Invalid phone number or password. Please check your credentials.";
+                if (error.message.includes("NetworkError") || error.message.includes("Failed to fetch")) {
+                    errorMessage = "Network error. Please check your internet connection and try again.";
+                } else if (error.message.includes("500")) {
+                    errorMessage = "Server error. Please try again later.";
+                }
+                
+                showAlert("Login Failed", errorMessage, "error");
+            }
+        });
+    }
     
     // Auth navigation links
-    document.getElementById('goToLoginLink').addEventListener('click', function() {
-        navigateTo('login');
-    });
+    const goToLoginLink = document.getElementById('goToLoginLink');
+    if (goToLoginLink) {
+        goToLoginLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            navigateTo('login');
+        });
+    }
     
-    document.getElementById('goToRegisterLink').addEventListener('click', function() {
-        navigateTo('register');
-    });
+    const goToRegisterLink = document.getElementById('goToRegisterLink');
+    if (goToRegisterLink) {
+        goToRegisterLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            navigateTo('register');
+        });
+    }
     
     // Dashboard
-    document.getElementById('startWorkoutBtn').addEventListener('click', function() {
-        AppState.selectedDayForWorkout = null;
-        
-        if (AppState.currentWorkoutDay === 0) {
-            showAlert("Rest Day", "Today is rest day! No workout scheduled. Take this day to recover and rejuvenate.", "info");
-            return;
-        }
-        navigateTo('warmup');
-    });
+    const startWorkoutBtn = document.getElementById('startWorkoutBtn');
+    if (startWorkoutBtn) {
+        startWorkoutBtn.addEventListener('click', function() {
+            AppState.selectedDayForWorkout = null;
+            
+            if (AppState.currentWorkoutDay === 0) {
+                showAlert("Rest Day", "Today is rest day! No workout scheduled. Take this day to recover and rejuvenate.", "info");
+                return;
+            }
+            navigateTo('warmup');
+        });
+    }
     
     // Warmup Page
-    document.getElementById('backToDashboardBtn').addEventListener('click', function() {
-        navigateTo('dashboard');
-    });
+    const backToDashboardBtn = document.getElementById('backToDashboardBtn');
+    if (backToDashboardBtn) {
+        backToDashboardBtn.addEventListener('click', function() {
+            navigateTo('dashboard');
+        });
+    }
     
-    document.getElementById('startMainWorkoutBtn').addEventListener('click', function() {
-        AppState.currentExerciseIndex = 0;
-        navigateTo('workout');
-    });
+    const startMainWorkoutBtn = document.getElementById('startMainWorkoutBtn');
+    if (startMainWorkoutBtn) {
+        startMainWorkoutBtn.addEventListener('click', function() {
+            AppState.currentExerciseIndex = 0;
+            navigateTo('workout');
+        });
+    }
     
     // Workout Sets Page
-    document.getElementById('backToDashboardFromSetsBtn').addEventListener('click', function() {
-        navigateTo('dashboard');
-    });
+    const backToDashboardFromSetsBtn = document.getElementById('backToDashboardFromSetsBtn');
+    if (backToDashboardFromSetsBtn) {
+        backToDashboardFromSetsBtn.addEventListener('click', function() {
+            navigateTo('dashboard');
+        });
+    }
     
-    document.getElementById('startWorkoutFromSetsBtn').addEventListener('click', function() {
-        navigateTo('warmup');
-    });
+    const startWorkoutFromSetsBtn = document.getElementById('startWorkoutFromSetsBtn');
+    if (startWorkoutFromSetsBtn) {
+        startWorkoutFromSetsBtn.addEventListener('click', function() {
+            navigateTo('warmup');
+        });
+    }
     
     // Workout Page
-    document.getElementById('backToSetsBtn').addEventListener('click', function() {
-        navigateTo('workoutSets');
-    });
+    const backToSetsBtn = document.getElementById('backToSetsBtn');
+    if (backToSetsBtn) {
+        backToSetsBtn.addEventListener('click', function() {
+            navigateTo('workoutSets');
+        });
+    }
     
-    document.getElementById('doneExerciseBtn').addEventListener('click', startCountdown);
+    const doneExerciseBtn = document.getElementById('doneExerciseBtn');
+    if (doneExerciseBtn) {
+        doneExerciseBtn.addEventListener('click', startCountdown);
+    }
     
     // YouTube Link Button
-    document.getElementById('youtubeLinkBtn').addEventListener('click', function() {
-        if (AppState.currentYoutubeLink) {
-            window.open(AppState.currentYoutubeLink, '_blank');
-        } else {
-            showAlert("No Tutorial", "No tutorial link available for this exercise.", "info");
-        }
-    });
+    const youtubeLinkBtn = document.getElementById('youtubeLinkBtn');
+    if (youtubeLinkBtn) {
+        youtubeLinkBtn.addEventListener('click', function() {
+            if (AppState.currentYoutubeLink) {
+                window.open(AppState.currentYoutubeLink, '_blank');
+            } else {
+                showAlert("No Tutorial", "No tutorial link available for this exercise.", "info");
+            }
+        });
+    }
     
     // Completion Page
-    document.getElementById('goToDashboardFromCompletionBtn').addEventListener('click', function() {
-        AppState.selectedDayForWorkout = null;
-        navigateTo('dashboard');
-    });
+    const goToDashboardFromCompletionBtn = document.getElementById('goToDashboardFromCompletionBtn');
+    if (goToDashboardFromCompletionBtn) {
+        goToDashboardFromCompletionBtn.addEventListener('click', function() {
+            AppState.selectedDayForWorkout = null;
+            navigateTo('dashboard');
+        });
+    }
     
     // Profile Page
-    document.getElementById('backToDashboardFromProfileBtn').addEventListener('click', function() {
-        navigateTo('dashboard');
-    });
+    const backToDashboardFromProfileBtn = document.getElementById('backToDashboardFromProfileBtn');
+    if (backToDashboardFromProfileBtn) {
+        backToDashboardFromProfileBtn.addEventListener('click', function() {
+            navigateTo('dashboard');
+        });
+    }
     
-    document.getElementById('saveProfileBtn').addEventListener('click', function(e) {
-        e.preventDefault();
-        saveProfileData();
-    });
+    const saveProfileBtn = document.getElementById('saveProfileBtn');
+    if (saveProfileBtn) {
+        saveProfileBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            saveProfileData();
+        });
+    }
     
     // Sidebar Controls
-    document.getElementById('hamburgerBtn').addEventListener('click', openSidebar);
-    document.getElementById('sidebarOverlay').addEventListener('click', closeSidebar);
+    if (hamburgerBtn) {
+        hamburgerBtn.addEventListener('click', openSidebar);
+    }
+    
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    if (sidebarOverlay) {
+        sidebarOverlay.addEventListener('click', closeSidebar);
+    }
     
     // Sidebar Menu Items
-    document.getElementById('sidebarHomeBtn').addEventListener('click', function() {
-        navigateTo('dashboard');
-        closeSidebar();
-    });
-    
-    document.getElementById('sidebarProfileBtn').addEventListener('click', function() {
-        navigateTo('profile');
-        closeSidebar();
-    });
-    
-    document.getElementById('sidebarLogoutBtn').addEventListener('click', function() {
-        showAlert("Confirm Logout", "Are you sure you want to logout?", "warning");
-        
-        const alertButton = document.getElementById('alertButton');
-        const originalText = alertButton.textContent;
-        const originalOnClick = alertButton.onclick;
-        
-        alertButton.textContent = "LOGOUT";
-        alertButton.onclick = function() {
-            // Clear all localStorage
-            ApiService.clearToken();
-            
-            // Reset AppState
-            AppState.user = null;
-            AppState.currentStreak = 0;
-            AppState.highestStreak = 0;
-            AppState.currentPage = 'hero';
-            
-            // Navigate to hero page
-            navigateTo('hero');
+    const sidebarHomeBtn = document.getElementById('sidebarHomeBtn');
+    if (sidebarHomeBtn) {
+        sidebarHomeBtn.addEventListener('click', function() {
+            navigateTo('dashboard');
             closeSidebar();
-            hideAlert();
+        });
+    }
+    
+    const sidebarProfileBtn = document.getElementById('sidebarProfileBtn');
+    if (sidebarProfileBtn) {
+        sidebarProfileBtn.addEventListener('click', function() {
+            navigateTo('profile');
+            closeSidebar();
+        });
+    }
+    
+    const sidebarLogoutBtn = document.getElementById('sidebarLogoutBtn');
+    if (sidebarLogoutBtn) {
+        sidebarLogoutBtn.addEventListener('click', function() {
+            showAlert("Confirm Logout", "Are you sure you want to logout?", "warning");
             
-            // Reset alert button
-            alertButton.textContent = originalText;
-            alertButton.onclick = originalOnClick;
-        };
-    });
+            const alertButton = document.getElementById('alertButton');
+            if (alertButton) {
+                const originalText = alertButton.textContent;
+                const originalOnClick = alertButton.onclick;
+                
+                alertButton.textContent = "LOGOUT";
+                alertButton.onclick = function() {
+                    // Clear all localStorage
+                    ApiService.clearToken();
+                    
+                    // Reset AppState
+                    AppState.user = null;
+                    AppState.currentStreak = 0;
+                    AppState.highestStreak = 0;
+                    AppState.currentPage = 'hero';
+                    
+                    // Navigate to hero page
+                    navigateTo('hero');
+                    closeSidebar();
+                    hideAlert();
+                    
+                    // Reset alert button
+                    alertButton.textContent = originalText;
+                    alertButton.onclick = originalOnClick;
+                };
+            }
+        });
+    }
+    
+    // Debug button (optional - for testing)
+    const debugBtn = document.getElementById('debugBtn');
+    if (debugBtn) {
+        debugBtn.addEventListener('click', async function() {
+            console.log('🐛 Debug button clicked');
+            const result = await debugDatabaseStatus();
+            if (result) {
+                showAlert("Debug Info", `Total users in database: ${result.count}`, "info");
+            }
+        });
+    }
 });
 
-// ✅ Check backend connection
+// ✅ Check backend connection on load
 window.addEventListener('load', function() {
     console.log('Testing backend connection...');
     
     // Try to check backend health
-    fetch(`${API_BASE_URL}/health`)
-        .then(response => {
-            if (response.ok) {
+    ApiService.checkBackendConnection()
+        .then(result => {
+            if (result.connected) {
                 console.log('✅ Backend is reachable');
-                return response.json();
+                console.log('Backend status:', result.data);
             } else {
-                throw new Error('Backend not responding');
+                console.log('❌ Backend connection issue:', result.error);
             }
         })
-        .then(data => {
-            console.log('Backend status:', data);
-        })
         .catch(error => {
-            console.log('❌ Backend is offline:', error.message);
+            console.log('❌ Backend check failed:', error.message);
         });
 });
 
@@ -1812,3 +2168,46 @@ window.addEventListener('beforeunload', function() {
     // Save current page
     saveCurrentPage(AppState.currentPage);
 });
+
+// ✅ Handle browser back/forward buttons
+window.addEventListener('popstate', function() {
+    const savedPage = loadCurrentPage();
+    if (savedPage !== AppState.currentPage) {
+        navigateTo(savedPage);
+    }
+});
+
+// ✅ Add reset password link if needed
+function addResetPasswordLink() {
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        const resetLink = document.createElement('a');
+        resetLink.href = '#';
+        resetLink.id = 'resetPasswordLink';
+        resetLink.textContent = 'Forgot Password?';
+        resetLink.style.display = 'block';
+        resetLink.style.textAlign = 'center';
+        resetLink.style.marginTop = '15px';
+        resetLink.style.color = '#FFD700';
+        resetLink.style.textDecoration = 'none';
+        
+        resetLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            showAlert("Reset Password", "Please contact support to reset your password.", "info");
+        });
+        
+        loginForm.appendChild(resetLink);
+    }
+}
+
+// Initialize reset password link
+setTimeout(addResetPasswordLink, 1000);
+
+// Export for debugging (optional)
+if (typeof window !== 'undefined') {
+    window.AppState = AppState;
+    window.ApiService = ApiService;
+    window.navigateTo = navigateTo;
+    window.showAlert = showAlert;
+    window.hideAlert = hideAlert;
+}
