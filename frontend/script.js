@@ -97,35 +97,35 @@ const AppState = {
             name: "Jumping Jacks",
             duration: "1 min",
             description: "Full body cardio warmup to increase heart rate and blood flow.",
-            youtubeLink: "https://www.youtube.com/results?search_query=jumping+jacks+warm+up",
+            youtubeLink: "https://www.youtube.com/shorts/FJDZrSZQLiY",
             video: "assets/videos/jumping-jacks.mp4"
         },
         {
             name: "High Knees",
             duration: "30-45 sec",
             description: "Dynamic leg exercise to activate leg muscles and improve coordination.",
-            youtubeLink: "https://www.youtube.com/results?search_query=high+knees+warm+up",
+            youtubeLink: "https://www.youtube.com/shorts/OWAzOZeIjH4",
             video: "assets/videos/high-knees.mp4"
         },
         {
             name: "Arm Swings (Forward + Backward)",
             duration: "20-20 reps",
             description: "Loosen up shoulder joints and improve upper body mobility.",
-            youtubeLink: "https://www.youtube.com/results?search_query=arm+swings+warm+up",
+            youtubeLink: "https://www.youtube.com/shorts/XTbPqeswd-Y",
             video: "assets/videos/arm-swings.mp4"
         },
         {
             name: "Neck Rotations",
             duration: "10 each side",
             description: "Gentle neck mobility exercise to prevent neck strain during workouts.",
-            youtubeLink: "https://www.youtube.com/results?search_query=neck+rotation+exercise",
+            youtubeLink: "https://www.youtube.com/shorts/ErB655NUEMA",
             video: "assets/videos/neck-rotations.mp4"
         },
         {
             name: "Shoulder Rotations",
             duration: "15-15 reps",
             description: "Warm up shoulder joints and rotator cuff muscles.",
-            youtubeLink: "https://www.youtube.com/results?search_query=shoulder+rotation+warm+up",
+            youtubeLink: "https://www.youtube.com/shorts/-Tvd1XFD8gs",
             video: "assets/videos/shoulder-rotations.mp4"
         },
         {
@@ -146,14 +146,14 @@ const AppState = {
             name: "Bodyweight Squats",
             duration: "15 reps",
             description: "Warm up legs, glutes, and core for lower body exercises.",
-            youtubeLink: "https://www.youtube.com/results?search_query=bodyweight+squat+warm+up",
+            youtubeLink: "https://www.youtube.com/shorts/-5LhNSMBrEs",
             video: "assets/videos/bodyweight-squats.mp4"
         },
         {
             name: "Hip Circles",
             duration: "10 each side",
             description: "Loosen up hip joints and improve hip mobility.",
-            youtubeLink: "https://www.youtube.com/results?search_query=hip+circle+exercise",
+            youtubeLink: "https://www.youtube.com/shorts/PZFKu9583Ms",
             video: "assets/videos/hip-circles.mp4"
         }
     ],
